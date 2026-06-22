@@ -1,0 +1,16 @@
+# Dependencies
+/node_modules
+
+# Generated snippet outputs — produced by scripts/build-snippets.mjs.
+# The generator templates + snippets.js are the source of truth.
+/docs/snippets/
+/static/img/snippets/
+/build/
+
+# Docusaurus build artifacts
+/.docusaurus
+/build-site
+
+# Misc
+.DS_Store
+*.log

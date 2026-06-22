@@ -1,0 +1,20 @@
+{
+  "name": "latex-snippets",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Runnable showcase of the latextemplates LaTeX snippets — a modern complement to The LaTeX Companion.",
+  "type": "module",
+  "scripts": {
+    "build:snippets": "node scripts/build-snippets.mjs",
+    "start": "docusaurus start",
+    "build": "npm run build:snippets && docusaurus build",
+    "serve": "docusaurus serve"
+  },
+  "dependencies": {
+    "ejs": "^3.1.10"
+  },
+  "comment:docusaurus": "Docusaurus deps (@docusaurus/core, @docusaurus/preset-classic, react, react-dom) are added when wiring the site run (M3). The snippet build pipeline only needs ejs + Docker.",
+  "engines": {
+    "node": ">=18"
+  }
+}

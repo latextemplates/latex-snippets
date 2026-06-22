@@ -1,0 +1,35 @@
+/* Snippet card: source on the left, rendered SVG output on the right. */
+.ltg-snippet {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: start;
+  margin: 1.5rem 0;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ltg-snippet__code pre {
+  margin: 0;
+  border-radius: 0;
+}
+
+.ltg-snippet__output {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: #f7fff7; /* matches the green ltgexample box in the PDF */
+}
+
+.ltg-snippet__output img {
+  max-width: 100%;
+  height: auto;
+}
+
+@media (max-width: 720px) {
+  .ltg-snippet {
+    grid-template-columns: 1fr;
+  }
+}
