@@ -7,7 +7,6 @@
 const config = {
   title: "LaTeX Snippets",
   tagline: "A runnable showcase of LaTeX packages — a modern complement to The LaTeX Companion",
-  favicon: "img/favicon.ico",
 
   url: "https://latextemplates.github.io",
   baseUrl: "/latex-snippets/",

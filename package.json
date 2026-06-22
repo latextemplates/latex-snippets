@@ -3,17 +3,24 @@
   "version": "0.0.0",
   "private": true,
   "description": "Runnable showcase of the latextemplates LaTeX snippets — a modern complement to The LaTeX Companion.",
-  "type": "module",
   "scripts": {
     "build:snippets": "node scripts/build-snippets.mjs",
     "start": "docusaurus start",
-    "build": "npm run build:snippets && docusaurus build",
-    "serve": "docusaurus serve"
+    "build": "npm run build:snippets && docusaurus build --out-dir build-site",
+    "serve": "docusaurus serve --dir build-site",
+    "clear": "docusaurus clear"
   },
   "dependencies": {
-    "ejs": "^3.1.10"
+    "@docusaurus/core": "^3.7.0",
+    "@docusaurus/preset-classic": "^3.7.0",
+    "@mdx-js/react": "^3.0.0",
+    "clsx": "^2.1.0",
+    "ejs": "^3.1.10",
+    "prism-react-renderer": "^2.3.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
   },
-  "comment:docusaurus": "Docusaurus deps (@docusaurus/core, @docusaurus/preset-classic, react, react-dom) are added when wiring the site run (M3). The snippet build pipeline only needs ejs + Docker.",
+  "comment:snippets": "The snippet build pipeline (build:snippets) needs only ejs + Docker; it resolves yeoman-test from the generator checkout. The rest are Docusaurus deps.",
   "engines": {
     "node": ">=18"
   }
