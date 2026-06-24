@@ -55,13 +55,15 @@ const config = {
     },
     footer: {
       style: "dark",
+      // Simple (flat) footer — no column header. Generator lives in the navbar.
       links: [
         {
-          title: "Project",
-          items: [
-            { label: "Generator (source of truth)", href: "https://github.com/latextemplates/generator-latex-template" },
-            { label: "The LaTeX Companion", href: "https://www.latex-project.org/help/books/" },
-          ],
+          label: "latex-snippets on GitHub",
+          href: "https://github.com/latextemplates/latex-snippets",
+        },
+        {
+          label: "The LaTeX Companion",
+          href: "https://www.latex-project.org/help/books/",
         },
       ],
     },
