@@ -4,3 +4,12 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+  # Bump the generator-latex-template submodule (tracks the branch set in
+  # .gitmodules) daily, so site content follows the generator with a one-PR lag.
+  # Targets dev: main is behind and carries the old build script, so a submodule
+  # bump there would break the build.
+  - package-ecosystem: "gitsubmodule"
+    directory: "/"
+    target-branch: "dev"
+    schedule:
+      interval: "daily"
