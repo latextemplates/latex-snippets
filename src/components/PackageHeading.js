@@ -5,20 +5,24 @@ import React from "react";
 // front-matter so this is the page's only H1.
 export default function PackageHeading({ title, ctan = [] }) {
   return (
-    <h1 className="package-heading">
-      <span className="package-heading__title">{title}</span>
-      {ctan.map((p) => (
-        <a
-          key={p.name}
-          className="ctan-tag"
-          href={p.url}
-          target="_blank"
-          rel="noreferrer"
-          title={`${p.name} on CTAN`}
-        >
-          {p.name}
-        </a>
-      ))}
-    </h1>
+    <header className="package-heading">
+      <h1 className="package-heading__title">{title}</h1>
+      {ctan.length > 0 && (
+        <div className="ctan-tags">
+          {ctan.map((p) => (
+            <a
+              key={p.name}
+              className="ctan-tag"
+              href={p.url}
+              target="_blank"
+              rel="noreferrer"
+              title={`${p.name} on CTAN`}
+            >
+              {p.name}
+            </a>
+          ))}
+        </div>
+      )}
+    </header>
   );
 }

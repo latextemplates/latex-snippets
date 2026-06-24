@@ -1,9 +1,13 @@
-/* Page heading with CTAN package tags next to the title. */
-.package-heading {
+/* Page heading with CTAN package tags on their own row below the title. */
+.package-heading__title {
+  margin-bottom: 0.5rem;
+}
+
+.ctan-tags {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.6rem;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
 }
 
 .ctan-tag {
