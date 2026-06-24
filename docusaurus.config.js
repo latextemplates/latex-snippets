@@ -66,6 +66,12 @@ const config = {
           href: "https://www.latex-project.org/help/books/",
         },
       ],
+      // Interim privacy notice. This site sets no cookies and uses no analytics;
+      // hosting (e.g. server-log/IP processing) is covered by GitHub. A full
+      // Impressum / Datenschutzerklärung is still recommended.
+      copyright:
+        'Hosted on GitHub Pages — no cookies or analytics are used by this site. ' +
+        'See the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noreferrer">GitHub Privacy Statement</a> for hosting data.',
     },
   },
 };
