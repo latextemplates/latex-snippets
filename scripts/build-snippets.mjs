@@ -444,7 +444,7 @@ async function buildPackage(slug, meta, locale) {
   // Uses the .de preamble where available even when the example falls back to en
   // (e.g. cleveref/siunitx have a German preamble but English example).
   let packagePreamble = null;
-  const preambleSrc = resolveSrc(stem, "preamble", locale);
+  const preambleSrc = resolveSrc(meta.preambleStem ?? stem, "preamble", locale);
   if (preambleSrc) {
     try {
       packagePreamble = await renderTemplate(preambleSrc.file, exampleProps);
