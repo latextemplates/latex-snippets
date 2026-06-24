@@ -14,7 +14,7 @@ const config = {
   projectName: "latex-snippets",
   onBrokenLinks: "warn",
 
-  i18n: { defaultLocale: "en", locales: ["en"] },
+  i18n: { defaultLocale: "en", locales: ["en", "de"] },
 
   presets: [
     [
@@ -42,6 +42,7 @@ const config = {
       title: "LaTeX Snippets",
       items: [
         { type: "docSidebar", sidebarId: "snippetsSidebar", label: "Snippets" },
+        { type: "localeDropdown", position: "right" },
         {
           href: "https://github.com/latextemplates/generator-latex-template",
           label: "Generator",

@@ -4,6 +4,8 @@
 # Generated snippet outputs — produced by scripts/build-snippets.mjs.
 # The generator templates + snippets.js are the source of truth.
 /docs/snippets/
+/i18n/de/docusaurus-plugin-content-docs/current/snippets/
+/i18n/de/docusaurus-plugin-content-docs/current.json
 /static/img/snippets/
 /build/
 

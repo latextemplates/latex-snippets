@@ -55,7 +55,30 @@ function resolveGeneratorDir() {
 const GENERATOR_DIR = resolveGeneratorDir();
 const TEMPLATES = join(GENERATOR_DIR, "generators/app/templates");
 const BUILD = join(ROOT, "build");
-const LANG = "en";
+
+const LANG = "en"; // default locale used by the prop templates below
+
+// Locales to build. English is the default (served at the site root); German is
+// served under /de/. German pages use <stem>.{example,preamble}.de.tex where it
+// exists and fall back to the English source otherwise.
+const LOCALES = ["en", "de"];
+const DOCS = {
+  en: join(ROOT, "docs/snippets"),
+  de: join(ROOT, "i18n/de/docusaurus-plugin-content-docs/current/snippets"),
+};
+
+// Resolve a template file for a locale, falling back to English. Returns the
+// file name and whether the localized (non-en) variant was used.
+function resolveSrc(stem, kind, locale) {
+  const localized = `${stem}.${kind}.${locale}.tex`;
+  if (locale !== "en" && existsSync(join(TEMPLATES, localized))) {
+    return { file: localized, localized: true };
+  }
+  const en = `${stem}.${kind}.en.tex`;
+  return existsSync(join(TEMPLATES, en))
+    ? { file: en, localized: false }
+    : null;
+}
 
 const BEGIN = "%%LTG-BEGIN%%";
 const END = "%%LTG-END%%";
@@ -127,8 +150,13 @@ const slugify = (s) =>
 
 const baseCache = new Map();
 
-async function getBase(configOverride) {
-  const options = { ...IEEE_OPTIONS, ...(configOverride ?? {}) };
+async function getBase(configOverride, locale = "en") {
+  const options = {
+    ...IEEE_OPTIONS,
+    lang: locale,
+    language: locale,
+    ...(configOverride ?? {}),
+  };
   const key = JSON.stringify(options, Object.keys(options).sort());
   if (baseCache.has(key)) return baseCache.get(key);
 
@@ -262,14 +290,14 @@ function hasUndefinedRefs(log) {
   return /undefined reference|Reference `[^']*' .*undefined/i.test(log);
 }
 
-async function compileFragmentToSvg(slug, idx, genDir, preamble, fragment, xrBase) {
-  const svgRel = `img/snippets/${slug}-${idx}.svg`;
+async function compileFragmentToSvg(svgSlug, idx, genDir, preamble, fragment, xrBase) {
+  const svgRel = `img/snippets/${svgSlug}-${idx}.svg`;
   const svgOut = join(ROOT, "static", svgRel);
   // Dev shortcut: reuse an already-compiled SVG (skip Docker) when iterating on
   // MDX/layout. Never set in CI, which always recompiles from a clean tree.
   if (process.env.REUSE_SVG && existsSync(svgOut)) return `/${svgRel}`;
 
-  const base = `_frag-${slug}-${idx}`;
+  const base = `_frag-${svgSlug}-${idx}`;
   const write = (doc) => writeFile(join(genDir, `${base}.tex`), doc);
 
   let firstErr = null;
@@ -289,11 +317,11 @@ async function compileFragmentToSvg(slug, idx, genDir, preamble, fragment, xrBas
     } catch {
       const e = texError(await readLog(genDir, base));
       throw new Error(
-        `compile failed (${slug} frag ${idx}):\n${firstErr ? `[plain] ${firstErr}\n` : ""}[xr] ${e}`,
+        `compile failed (${svgSlug} frag ${idx}):\n${firstErr ? `[plain] ${firstErr}\n` : ""}[xr] ${e}`,
       );
     }
   } else if (firstErr !== null) {
-    throw new Error(`compile failed (${slug} frag ${idx}):\n${firstErr}`);
+    throw new Error(`compile failed (${svgSlug} frag ${idx}):\n${firstErr}`);
   }
 
   await dockerTexlive(genDir, [
@@ -311,7 +339,7 @@ async function compileFragmentToSvg(slug, idx, genDir, preamble, fragment, xrBas
 
 // --- MDX ------------------------------------------------------------------
 
-function mdx(slug, meta, preamble, fragments) {
+function mdx(slug, meta, description, preamble, fragments) {
   const title = meta.title ?? slug;
   const ctanJson = JSON.stringify(
     (meta.ctan ?? []).map((p) => ({
@@ -358,7 +386,7 @@ import TabItem from '@theme/TabItem';
 
 <PackageHeading title=${JSON.stringify(title)} ctan={${ctanJson}} />
 
-${meta.description}
+${description}
 
 <Tabs>
 <TabItem value="example" label="Example" default>
@@ -371,10 +399,29 @@ ${preambleTab}
 `;
 }
 
-async function buildPackage(slug, meta) {
+// Remembers the English example build (code + svg per fragment) so a German
+// fallback page (no .de example) reuses the exact same SVGs — including which
+// fragments were skipped — instead of recompiling.
+const enExampleBuilt = new Map();
+
+async function buildPackage(slug, meta, locale) {
   const stem = meta.stem ?? slug;
   const cfg = meta.config ?? {};
-  const exampleProps = { ...EXAMPLE_PROPS, ...cfg };
+
+  const exampleSrc = resolveSrc(stem, "example", locale);
+  if (!exampleSrc) {
+    console.log(`  (no example for stem '${stem}'; skipping)`);
+    return false;
+  }
+  const localized = exampleSrc.localized; // true → genuine .de content
+  const contentLocale = localized ? locale : "en";
+
+  const exampleProps = {
+    ...EXAMPLE_PROPS,
+    ...cfg,
+    lang: contentLocale,
+    language: contentLocale,
+  };
   // Derive the quote commands from the (possibly overridden) enquotes switch,
   // mirroring index.js, so e.g. the textcmds page uses \qq instead of \enquote.
   if (exampleProps.enquotes === "textcmds") {
@@ -385,35 +432,58 @@ async function buildPackage(slug, meta) {
     exampleProps.equote = "}";
   }
 
-  const exampleRaw = await renderTemplate(
-    `${stem}.example.${LANG}.tex`,
-    exampleProps,
+  const fragments = extractFragments(
+    await renderTemplate(exampleSrc.file, exampleProps),
   );
-  if (exampleRaw === null) {
-    console.log(`  (no example for stem '${stem}'; skipping)`);
-    return false;
-  }
-  const fragments = extractFragments(exampleRaw);
   if (!fragments.length) {
     console.log(`  (no fragments for ${slug})`);
     return false;
   }
 
   // The package's own preamble snippet (\usepackage … setup), shown on the page.
+  // Uses the .de preamble where available even when the example falls back to en
+  // (e.g. cleveref/siunitx have a German preamble but English example).
   let packagePreamble = null;
-  try {
-    packagePreamble = await renderTemplate(
-      `${stem}.preamble.${LANG}.tex`,
-      exampleProps,
-    );
-  } catch (e) {
-    console.warn(`    ↳ preamble render failed: ${e.message.split("\n")[0]}`);
+  const preambleSrc = resolveSrc(stem, "preamble", locale);
+  if (preambleSrc) {
+    try {
+      packagePreamble = await renderTemplate(preambleSrc.file, exampleProps);
+    } catch (e) {
+      console.warn(`    ↳ preamble render failed: ${e.message.split("\n")[0]}`);
+    }
   }
 
-  const { genDir, preamble } = await getBase(cfg);
+  const description =
+    locale === "de"
+      ? (meta.de?.description ?? meta.description)
+      : meta.description;
+  const catSlug = slugify(meta.category ?? "misc");
+  const outMdx = join(DOCS[locale], catSlug, `${slug}.mdx`);
+
+  const writePage = async (built) => {
+    await mkdir(dirname(outMdx), { recursive: true });
+    await writeFile(outMdx, mdx(slug, meta, description, packagePreamble, built));
+  };
+
+  // German fallback (no .de example): reuse the English example build verbatim.
+  if (locale !== "en" && !localized) {
+    const built = enExampleBuilt.get(slug);
+    if (!built) {
+      console.log(`  (no English build to reuse for ${slug})`);
+      return false;
+    }
+    await writePage(built);
+    console.log(`  wrote ${locale}/${catSlug}/${slug}.mdx (reused en svgs)`);
+    return true;
+  }
+
+  // Compile (English, or a genuine localized example). Localized examples get a
+  // locale-suffixed SVG slug so they don't clash with the English ones.
+  const svgSlug = localized ? `${slug}.${locale}` : slug;
+  const { genDir, preamble } = await getBase(cfg, contentLocale);
 
   // Context document for xr-hyper (only if the example defines labels).
-  const exampleFull = await renderTemplate(`${stem}.example.${LANG}.tex`, {
+  const exampleFull = await renderTemplate(exampleSrc.file, {
     ...exampleProps,
     bexample: "",
     eexample: "",
@@ -421,8 +491,11 @@ async function buildPackage(slug, meta) {
   });
   let xrBase = null;
   if (/\\label\b/.test(exampleFull)) {
-    const ctxBase = `_ctx-${slug}`;
-    await writeFile(join(genDir, `${ctxBase}.tex`), contextDoc(preamble, exampleFull));
+    const ctxBase = `_ctx-${svgSlug}`;
+    await writeFile(
+      join(genDir, `${ctxBase}.tex`),
+      contextDoc(preamble, exampleFull),
+    );
     try {
       await compileTwice(genDir, ctxBase);
       xrBase = ctxBase;
@@ -436,7 +509,7 @@ async function buildPackage(slug, meta) {
     process.stdout.write(`  fragment ${i}: compiling… `);
     try {
       const svg = await compileFragmentToSvg(
-        slug,
+        svgSlug,
         i,
         genDir,
         preamble,
@@ -455,16 +528,15 @@ async function buildPackage(slug, meta) {
     return false;
   }
 
-  const catSlug = slugify(meta.category ?? "misc");
-  const outMdx = join(ROOT, "docs/snippets", catSlug, `${slug}.mdx`);
-  await mkdir(dirname(outMdx), { recursive: true });
-  await writeFile(outMdx, mdx(slug, meta, packagePreamble, built));
-  console.log(`  wrote docs/snippets/${catSlug}/${slug}.mdx (${built.length} fragments)`);
+  if (locale === "en") enExampleBuilt.set(slug, built);
+  await writePage(built);
+  console.log(`  wrote ${locale}/${catSlug}/${slug}.mdx (${built.length} fragments)`);
   return true;
 }
 
-// Write _category_.json so the sidebar shows ordered, nicely-labelled groups.
-async function writeCategoryMeta(categories, used) {
+// Write _category_.json so the sidebar shows ordered, nicely-labelled groups
+// (with the German label for the de locale).
+async function writeCategoryMeta(categories, used, locale, labels) {
   const order = categories ?? [];
   const seen = [...used];
   // Keep declared order first, then any leftover categories.
@@ -474,55 +546,80 @@ async function writeCategoryMeta(categories, used) {
   ];
   for (let i = 0; i < ordered.length; i++) {
     const cat = ordered[i];
-    const dir = join(ROOT, "docs/snippets", slugify(cat));
+    const dir = join(DOCS[locale], slugify(cat));
     if (!existsSync(dir)) continue;
+    const label = locale === "de" ? (labels?.de?.[cat] ?? cat) : cat;
     await writeFile(
       join(dir, "_category_.json"),
-      JSON.stringify({ label: cat, position: i + 1 }, null, 2) + "\n",
+      JSON.stringify({ label, position: i + 1 }, null, 2) + "\n",
     );
   }
 }
 
+// Translate the autogenerated sidebar's category labels for a locale. Docusaurus
+// reads these from current.json (keyed sidebar.<id>.category.<Name>), not from
+// the per-folder _category_.json.
+async function writeSidebarTranslations(categories, labels) {
+  const out = {};
+  for (const cat of categories ?? []) {
+    out[`sidebar.snippetsSidebar.category.${cat}`] = {
+      message: labels?.de?.[cat] ?? cat,
+    };
+  }
+  const file = join(
+    ROOT,
+    "i18n/de/docusaurus-plugin-content-docs/current.json",
+  );
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, JSON.stringify(out, null, 2) + "\n");
+}
+
 async function main() {
   const mod = await import(join(GENERATOR_DIR, "generators/app/snippets.js"));
-  const { snippets, categories } = mod;
+  const { snippets, categories, categoryLabels } = mod;
   const requested = process.argv.slice(2);
   const slugs = requested.length ? requested : Object.keys(snippets);
 
   await rm(join(BUILD, "_gen"), { recursive: true, force: true });
-  // Full build (no explicit packages): clear generated pages so removed/renamed
-  // packages and stale categories don't linger. SVGs are left in place so
-  // REUSE_SVG can still skip recompiles.
-  if (!requested.length) {
-    await rm(join(ROOT, "docs/snippets"), { recursive: true, force: true });
-  }
-  const ok = [];
-  const failed = [];
-  const usedCategories = new Set();
-  for (const slug of slugs) {
-    const meta = snippets[slug];
-    if (!meta) {
-      console.warn(`! ${slug}: not in snippets.js, skipping`);
-      continue;
+
+  // English first (its SVGs are reused by German fallback pages), then German.
+  for (const locale of LOCALES) {
+    console.log(`\n=== locale: ${locale} ===`);
+    // Full build (no explicit packages): clear generated pages so removed/
+    // renamed packages and stale categories don't linger. SVGs are left in
+    // place so REUSE_SVG can still skip recompiles.
+    if (!requested.length) {
+      await rm(DOCS[locale], { recursive: true, force: true });
     }
-    console.log(`▶ ${slug}  [${meta.category}]`);
-    try {
-      if (await buildPackage(slug, meta)) {
-        ok.push(slug);
-        usedCategories.add(meta.category);
-      } else {
+    const ok = [];
+    const failed = [];
+    const usedCategories = new Set();
+    for (const slug of slugs) {
+      const meta = snippets[slug];
+      if (!meta) {
+        console.warn(`! ${slug}: not in snippets.js, skipping`);
+        continue;
+      }
+      console.log(`▶ ${slug}  [${meta.category}]`);
+      try {
+        if (await buildPackage(slug, meta, locale)) {
+          ok.push(slug);
+          usedCategories.add(meta.category);
+        } else {
+          failed.push(slug);
+        }
+      } catch (e) {
+        console.warn(`  ✗ ${e.message}`);
         failed.push(slug);
       }
-    } catch (e) {
-      console.warn(`  ✗ ${e.message}`);
-      failed.push(slug);
     }
+    await writeCategoryMeta(categories, usedCategories, locale, categoryLabels);
+    if (locale === "de") {
+      await writeSidebarTranslations(categories, categoryLabels);
+    }
+    console.log(`${locale} built: ${ok.join(", ") || "(none)"}`);
+    if (failed.length) console.log(`${locale} failed/empty: ${failed.join(", ")}`);
   }
-
-  await writeCategoryMeta(categories, usedCategories);
-
-  console.log(`\nDone. built: ${ok.join(", ") || "(none)"}`);
-  if (failed.length) console.log(`failed/empty: ${failed.join(", ")}`);
 }
 
 main().catch((e) => {
