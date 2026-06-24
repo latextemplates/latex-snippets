@@ -33,6 +33,11 @@ const config = {
   ],
 
   themeConfig: {
+    // Prism doesn't bundle LaTeX by default; load it so ```latex blocks are
+    // syntax-highlighted.
+    prism: {
+      additionalLanguages: ["latex"],
+    },
     navbar: {
       title: "LaTeX Snippets",
       items: [

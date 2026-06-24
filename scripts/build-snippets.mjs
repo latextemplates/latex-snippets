@@ -318,15 +318,6 @@ function mdx(slug, meta, preamble, fragments) {
       url: `https://ctan.org/pkg/${p}`,
     })),
   );
-  const preambleSection = preamble
-    ? `## Preamble
-
-\`\`\`latex
-${preamble.trim()}
-\`\`\`
-
-`
-    : "";
   const blocks = fragments
     .map(
       (f) => `<Snippet svg="${f.svg}">
@@ -339,6 +330,17 @@ ${f.code}
     )
     .join("\n\n");
 
+  // Example + Preamble as tabs, Example first (default).
+  const preambleTab = preamble
+    ? `<TabItem value="preamble" label="Preamble">
+
+\`\`\`latex
+${preamble.trim()}
+\`\`\`
+
+</TabItem>`
+    : "";
+
   // hide_title: PackageHeading renders the only H1 (title + CTAN tags).
   // Flat, package-keyed canonical URL (/snippets/<package>), independent of the
   // category folder the file lives in (the folder drives the sidebar hierarchy).
@@ -350,14 +352,21 @@ hide_title: true
 
 import Snippet from '@site/src/components/Snippet';
 import PackageHeading from '@site/src/components/PackageHeading';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 <PackageHeading title=${JSON.stringify(title)} ctan={${ctanJson}} />
 
 ${meta.description}
 
-${preambleSection}## Examples
+<Tabs>
+<TabItem value="example" label="Example" default>
 
 ${blocks}
+
+</TabItem>
+${preambleTab}
+</Tabs>
 `;
 }
 

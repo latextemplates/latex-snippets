@@ -54,7 +54,16 @@
 .ltg-snippet__code pre {
   margin: 0;
   border-radius: 0;
-  overflow-x: auto;
+}
+
+/* Soft-wrap code instead of a horizontal scrollbar (applies to every code
+   block on a snippet page: the example cards and the preamble tab). */
+.theme-code-block .prism-code,
+.theme-code-block .prism-code code,
+.theme-code-block .token-line {
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .ltg-snippet__output {
