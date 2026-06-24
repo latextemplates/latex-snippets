@@ -80,6 +80,8 @@
   background: #f7fff7; /* matches the green ltgexample box in the PDF */
   border-radius: 8px;
   overflow: visible;
+  transition: transform 0.15s ease;
+  transform-origin: center;
 }
 
 .ltg-snippet__output img {
@@ -88,12 +90,11 @@
   zoom: 1.4;
   max-width: 100%;
   height: auto;
-  transition: transform 0.15s ease;
-  transform-origin: center;
 }
 
-/* Hover to magnify the rendered output to 150% (vector, stays crisp). */
-.ltg-snippet__output img:hover {
+/* Hover to magnify the rendered output to 150% — scale the whole cell so the
+   green background grows with the (vector, crisp) text and it stays readable. */
+.ltg-snippet__output:hover {
   transform: scale(1.5);
   position: relative;
   z-index: 20;
