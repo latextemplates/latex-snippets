@@ -32,10 +32,11 @@
   text-decoration: none;
 }
 
-/* Snippet card: source on the left, rendered SVG output on the right. */
+/* Snippet card: rendered SVG output on the left (a bit wider), source on the
+   right. */
 .ltg-snippet {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1.4fr 1fr;
   gap: 1rem;
   align-items: start;
   margin: 1.5rem 0;
@@ -75,6 +76,9 @@
 }
 
 .ltg-snippet__output img {
+  /* Render the (vector) output a bit larger than its natural 10pt size for
+     readability; max-width still keeps wide outputs within the column. */
+  zoom: 1.4;
   max-width: 100%;
   height: auto;
 }

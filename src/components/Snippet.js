@@ -7,10 +7,10 @@ import useBaseUrl from "@docusaurus/useBaseUrl";
 export default function Snippet({ svg, children }) {
   return (
     <div className="ltg-snippet">
-      <div className="ltg-snippet__code">{children}</div>
       <div className="ltg-snippet__output">
         <img src={useBaseUrl(svg)} alt="Rendered LaTeX output" loading="lazy" />
       </div>
+      <div className="ltg-snippet__code">{children}</div>
     </div>
   );
 }
