@@ -1,10 +1,10 @@
 name: Build and deploy
 
-# Deploys to GitHub Pages on every push to main OR dev — so dev pushes also go
-# live (one Pages environment; the most recent push wins). Manual runs allowed.
+# Deploys to GitHub Pages on every push to main (one Pages environment; the most
+# recent push wins). Manual runs allowed.
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
