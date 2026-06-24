@@ -1,31 +1,29 @@
-// build-snippets.mjs — resolve LTG templates → MDX + compiled SVG.
+// build-snippets.mjs — resolve LTG templates → categorized MDX + compiled SVG.
 //
-// Faithful, single-source design (the generator is the source of truth):
+// Package-centric: one entry in the generator's snippets.js = one CTAN package =
+// one page, filed under a feature category. Pages that share a template `stem`
+// but select a different package (Source Code → minted/listings via the
+// `listings` switch; Comments & TODOs → todonotes/pdfcomment via the `todo`
+// switch) are rendered under that package's `config` override.
 //
-//   * PREAMBLE — produced by running the REAL generator (via yeoman-test, the
-//     same way the test suite does) for the canonical IEEE config. We take
-//     everything before \begin{document} from the generated paper.tex, strip
-//     the \documentclass line, and host it under a `standalone` wrapper. No
-//     re-derivation of index.js's prop logic, so the preamble never drifts.
-//     The generated directory (with commands.tex, the .bib, etc.) is reused as
-//     the compile working dir, so every \input{...} resolves.
+// Faithful, single-source design:
+//   * PREAMBLE — produced by running the REAL generator (yeoman-test) for the
+//     canonical IEEE config merged with the page's `config`. One base template
+//     per distinct effective config, cached and reused as the compile dir so
+//     every \input{...} resolves. No re-derivation of index.js's prop logic.
+//   * FRAGMENTS — each <stem>.example.en.tex is EJS-rendered with bexample/
+//     eexample markers (plus the page's config, e.g. todo=pdfcomment) and split
+//     into code+output fragments. Reliable package→fragment mapping.
 //
-//   * FRAGMENTS — each <stem>.example.en.tex is EJS-rendered on its own with
-//     bexample/eexample set to unique markers, then split into individual
-//     code+output fragments. This keeps a reliable stem→fragment mapping (the
-//     generated paper.tex interleaves and wraps examples, which is ambiguous).
-//     Example templates need only a small, stable prop set (EXAMPLE_PROPS).
+// Each fragment compiles (two passes, standalone host; xr-hyper fallback for
+// out-of-block cross-references) to a cropped DVI via the texlive/texlive Docker
+// image, then to SVG with dvisvgm (DVI route: dvisvgm --pdf needs GS<10.01).
 //
-// Each fragment is compiled (shared preamble + fragment, standalone class) to a
-// cropped DVI via the texlive/texlive Docker image, then to SVG with dvisvgm
-// (DVI route: dvisvgm --pdf needs Ghostscript<10.01/mutool, absent here).
+// Generated outputs (docs/snippets/**, static/img/snippets/*.svg, build/) are
+// gitignored — this script is the source of truth, never hand-edit them.
 //
-// Generated outputs (docs/snippets/*.mdx, static/img/snippets/*.svg, build/)
-// are gitignored — this script is the source of truth, never hand-edit them.
-//
-// Usage:  node scripts/build-snippets.mjs [stem ...]   (default: all in snippets.js)
+// Usage:  node scripts/build-snippets.mjs [package ...]   (default: all)
 //   env GENERATOR_DIR  path to the generator-latex-template checkout
-//                      (default: ../generator-latex-template)
 
 import { readFile, writeFile, mkdir, rm, cp } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -36,13 +34,8 @@ import { dirname, join, resolve } from "node:path";
 import ejs from "ejs";
 
 const execFileAsync = promisify(execFile);
-
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-// Locate the generator checkout. Prefer GENERATOR_DIR, then the git submodule
-// at ./generator-latex-template (CI / published repo), then a flat-workspace
-// sibling ../generator-latex-template (local dev). A candidate only counts if it
-// actually contains snippets.js — skips an un-inited (empty) submodule dir.
 function resolveGeneratorDir() {
   const candidates = [
     process.env.GENERATOR_DIR,
@@ -61,16 +54,14 @@ function resolveGeneratorDir() {
 
 const GENERATOR_DIR = resolveGeneratorDir();
 const TEMPLATES = join(GENERATOR_DIR, "generators/app/templates");
-const GEN_DIR = join(ROOT, "build", "_gen"); // reused as the LaTeX compile dir
+const BUILD = join(ROOT, "build");
 const LANG = "en";
 
-// Unique markers substituted for bexample/eexample so the resolved example can
-// be split back into individual code+output fragments.
 const BEGIN = "%%LTG-BEGIN%%";
 const END = "%%LTG-END%%";
 
-// The canonical global config: IEEE conference paper (papers are the main
-// audience). Option names/values mirror __tests__/matrix.js → toOptions().
+// Canonical global config (IEEE conference paper). A page's `config` overrides
+// merge on top. Option names/values mirror __tests__/matrix.js → toOptions().
 const IEEE_OPTIONS = {
   documentclass: "ieee",
   ieeevariant: "conference",
@@ -90,12 +81,8 @@ const IEEE_OPTIONS = {
   howtotext: "false",
 };
 
-// Props needed only to render the *example* templates (small + stable). The
-// heavy preamble props all come from the real generator, not from here.
-// Identifiers actually referenced across *.example.en.tex (harvested): heading2,
-// documentclass, reallatexcompiler, bquote/equote, tweakouterquote, todo,
-// isThesis, filenames, available, plus the bexample/eexample markers. Kept in
-// sync with the IEEE config above.
+// Props for rendering the *example* templates (small + stable). The page's
+// config (e.g. { todo: "pdfcomment" }) is merged in per page.
 const EXAMPLE_PROPS = {
   documentclass: "ieee",
   ieeevariant: "conference",
@@ -124,12 +111,22 @@ const EXAMPLE_PROPS = {
 const UID = process.getuid?.() ?? 0;
 const GID = process.getgid?.() ?? 0;
 
-// --- generator-sourced preamble ------------------------------------------
+const slugify = (s) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 
-// Run the real generator (yeoman-test) into GEN_DIR. yeoman-test and the
-// generator's own deps resolve from the generator checkout, so we run a tiny
-// helper via `node --eval` with cwd = GENERATOR_DIR.
-async function generateBaseTemplate() {
+// --- generator-sourced base template (one per distinct effective config) -----
+
+const baseCache = new Map();
+
+async function getBase(configOverride) {
+  const options = { ...IEEE_OPTIONS, ...(configOverride ?? {}) };
+  const key = JSON.stringify(options, Object.keys(options).sort());
+  if (baseCache.has(key)) return baseCache.get(key);
+
+  const genDir = join(BUILD, "_gen", `cfg-${baseCache.size}`);
   const helper = `
 import helpers from 'yeoman-test';
 import { cp, rm } from 'node:fs/promises';
@@ -145,26 +142,27 @@ rr.cleanup();
       ...process.env,
       LTG_OPTS: JSON.stringify({
         gen: join(GENERATOR_DIR, "generators/app"),
-        options: IEEE_OPTIONS,
-        out: GEN_DIR,
+        options,
+        out: genDir,
       }),
     },
     maxBuffer: 32 * 1024 * 1024,
   });
 
-  const paper = await readFile(join(GEN_DIR, "paper.tex"), "utf8");
+  const paper = await readFile(join(genDir, "paper.tex"), "utf8");
   const at = paper.indexOf("\\begin{document}");
   if (at < 0) throw new Error("no \\begin{document} in generated paper.tex");
-  // Preamble = everything before \begin{document}, minus the \documentclass
-  // line (the standalone wrapper provides the class).
-  return paper.slice(0, at).replace(/\\documentclass\b[^\n]*\n/, "");
+  const preamble = paper
+    .slice(0, at)
+    .replace(/\\documentclass\b[^\n]*\n/, "");
+
+  const base = { genDir, preamble };
+  baseCache.set(key, base);
+  return base;
 }
 
-// Tightly-cropped standalone box for one fragment. Floats inside the fragment
-// (e.g. minted's `listing`) render in place, and in-block \label/\ref resolve
-// across two passes. When `xrBase` is given, xr-hyper imports that context
-// document's labels so references pointing OUTSIDE the block (e.g. cleveref's
-// \Cref{fig:…}) resolve to the same numbers they'd have in the full example.
+// --- hosts ----------------------------------------------------------------
+
 function standaloneDoc(preamble, fragment, xrBase) {
   const xr = xrBase
     ? `\\usepackage{xr-hyper}\n\\externaldocument{${xrBase}}\n`
@@ -177,10 +175,6 @@ ${fragment}
 `;
 }
 
-// Context document: the FULL example (bexample blocks unwrapped) typeset as a
-// normal article, so every \caption/\label runs and the resulting .aux carries
-// the real cross-reference numbers. Compiled once per stem; fragments import its
-// labels via xr-hyper. Unlike preview(active), nothing here is gobbled.
 function contextDoc(preamble, exampleFull) {
   return `\\documentclass[a4paper,10pt]{article}
 ${preamble}
@@ -220,8 +214,6 @@ async function dockerTexlive(workdir, args) {
       "--rm",
       "-u",
       `${UID}:${GID}`,
-      // Arbitrary host UID with no home in the image: give luaotfload (and
-      // friends) a writable cache/home under the mount.
       "-e",
       "HOME=/workdir",
       "-v",
@@ -233,11 +225,9 @@ async function dockerTexlive(workdir, args) {
   );
 }
 
-// DVI output (dvisvgm renders DVI without Ghostscript/mutool). -shell-escape:
-// the canonical config uses minted (Pygments). Two passes resolve \label→\ref.
-async function compileTwice(base) {
+async function compileTwice(genDir, base) {
   for (let pass = 0; pass < 2; pass++) {
-    await dockerTexlive(GEN_DIR, [
+    await dockerTexlive(genDir, [
       "dvilualatex",
       "-interaction=nonstopmode",
       "-halt-on-error",
@@ -247,8 +237,8 @@ async function compileTwice(base) {
   }
 }
 
-async function readLog(base) {
-  const p = join(GEN_DIR, `${base}.log`);
+async function readLog(genDir, base) {
+  const p = join(genDir, `${base}.log`);
   return existsSync(p) ? readFile(p, "utf8") : "";
 }
 
@@ -266,37 +256,35 @@ function hasUndefinedRefs(log) {
   return /undefined reference|Reference `[^']*' .*undefined/i.test(log);
 }
 
-async function compileFragmentToSvg(stem, idx, preamble, fragment, xrBase) {
-  const base = `_frag-${stem}-${idx}`;
-  const write = (doc) => writeFile(join(GEN_DIR, `${base}.tex`), doc);
+async function compileFragmentToSvg(slug, idx, genDir, preamble, fragment, xrBase) {
+  const base = `_frag-${slug}-${idx}`;
+  const write = (doc) => writeFile(join(genDir, `${base}.tex`), doc);
 
-  // 1) Standalone, no external labels (fast; floats render in place).
   let firstErr = null;
   await write(standaloneDoc(preamble, fragment, null));
   try {
-    await compileTwice(base);
+    await compileTwice(genDir, base);
   } catch {
-    firstErr = texError(await readLog(base));
+    firstErr = texError(await readLog(genDir, base));
   }
-  // 2) If it failed, or left references that point outside the block, retry
-  //    importing the context document's labels via xr-hyper.
   const needsXr =
-    xrBase && (firstErr !== null || hasUndefinedRefs(await readLog(base)));
+    xrBase &&
+    (firstErr !== null || hasUndefinedRefs(await readLog(genDir, base)));
   if (needsXr) {
     await write(standaloneDoc(preamble, fragment, xrBase));
     try {
-      await compileTwice(base);
+      await compileTwice(genDir, base);
     } catch {
-      const e = texError(await readLog(base));
+      const e = texError(await readLog(genDir, base));
       throw new Error(
-        `compile failed (${stem} frag ${idx}):\n${firstErr ? `[plain] ${firstErr}\n` : ""}[xr] ${e}`,
+        `compile failed (${slug} frag ${idx}):\n${firstErr ? `[plain] ${firstErr}\n` : ""}[xr] ${e}`,
       );
     }
   } else if (firstErr !== null) {
-    throw new Error(`compile failed (${stem} frag ${idx}):\n${firstErr}`);
+    throw new Error(`compile failed (${slug} frag ${idx}):\n${firstErr}`);
   }
 
-  await dockerTexlive(GEN_DIR, [
+  await dockerTexlive(genDir, [
     "dvisvgm",
     "--no-fonts",
     "--bbox=preview",
@@ -304,16 +292,17 @@ async function compileFragmentToSvg(stem, idx, preamble, fragment, xrBase) {
     `${base}.dvi`,
   ]);
 
-  const svgRel = `img/snippets/${stem}-${idx}.svg`;
+  const svgRel = `img/snippets/${slug}-${idx}.svg`;
   const svgOut = join(ROOT, "static", svgRel);
   await mkdir(dirname(svgOut), { recursive: true });
-  await cp(join(GEN_DIR, `${base}.svg`), svgOut);
+  await cp(join(genDir, `${base}.svg`), svgOut);
   return `/${svgRel}`;
 }
 
 // --- MDX ------------------------------------------------------------------
 
-function mdx(meta, fragments) {
+function mdx(slug, meta, fragments) {
+  const title = meta.title ?? slug;
   const ctan = (meta.ctan ?? [])
     .map((p) => `[\`${p}\`](https://ctan.org/pkg/${p})`)
     .join(" · ");
@@ -330,12 +319,12 @@ ${f.code}
     .join("\n\n");
 
   return `---
-title: ${JSON.stringify(meta.title)}
+title: ${JSON.stringify(title)}
 ---
 
 import Snippet from '@site/src/components/Snippet';
 
-# ${meta.title}
+# ${title}
 
 ${meta.description}
 
@@ -344,42 +333,40 @@ ${blocks}
 `;
 }
 
-async function buildStem(stem, meta, preamble) {
+async function buildPackage(slug, meta) {
+  const stem = meta.stem ?? slug;
+  const cfg = meta.config ?? {};
+  const exampleProps = { ...EXAMPLE_PROPS, ...cfg };
+
   const exampleRaw = await renderTemplate(
     `${stem}.example.${LANG}.tex`,
-    EXAMPLE_PROPS,
+    exampleProps,
   );
   if (exampleRaw === null) {
-    console.log(`  (no example for ${stem}; preamble-only snippet, skipping)`);
+    console.log(`  (no example for stem '${stem}'; skipping)`);
     return false;
   }
   const fragments = extractFragments(exampleRaw);
   if (!fragments.length) {
-    console.log(`  (no fragments found for ${stem})`);
+    console.log(`  (no fragments for ${slug})`);
     return false;
   }
 
-  // Build a context document (full example as a normal article) when the
-  // example defines labels, so fragments can import their numbers via xr-hyper.
-  // bexample/eexample empty → the example renders the way it does in the real
-  // document. Compiled once; reused by every fragment of this stem.
+  const { genDir, preamble } = await getBase(cfg);
+
+  // Context document for xr-hyper (only if the example defines labels).
   const exampleFull = await renderTemplate(`${stem}.example.${LANG}.tex`, {
-    ...EXAMPLE_PROPS,
+    ...exampleProps,
     bexample: "",
     eexample: "",
-    // Top-level heading in the article context doc so a referenced section
-    // numbers as "Section 1" rather than "Section 0.1".
     heading2: "\\section",
   });
   let xrBase = null;
   if (/\\label\b/.test(exampleFull)) {
-    const ctxBase = `_ctx-${stem}`;
-    await writeFile(
-      join(GEN_DIR, `${ctxBase}.tex`),
-      contextDoc(preamble, exampleFull),
-    );
+    const ctxBase = `_ctx-${slug}`;
+    await writeFile(join(genDir, `${ctxBase}.tex`), contextDoc(preamble, exampleFull));
     try {
-      await compileTwice(ctxBase);
+      await compileTwice(genDir, ctxBase);
       xrBase = ctxBase;
     } catch {
       console.warn(`    ↳ context doc failed; cross-refs may stay unresolved`);
@@ -391,8 +378,9 @@ async function buildStem(stem, meta, preamble) {
     process.stdout.write(`  fragment ${i}: compiling… `);
     try {
       const svg = await compileFragmentToSvg(
-        stem,
+        slug,
         i,
+        genDir,
         preamble,
         fragments[i],
         xrBase,
@@ -400,54 +388,77 @@ async function buildStem(stem, meta, preamble) {
       console.log("svg ✓");
       built.push({ code: fragments[i], svg });
     } catch (e) {
-      // Skip just this fragment (e.g. margin notes can't render in a tight
-      // standalone box) — keep the others rather than dropping the page.
       console.log("skipped");
       console.warn(`    ↳ ${e.message.replace(/\n/g, "\n      ")}`);
     }
   }
   if (!built.length) {
-    console.log(`  (no fragments compiled for ${stem})`);
+    console.log(`  (no fragments compiled for ${slug})`);
     return false;
   }
 
-  const outMdx = join(ROOT, "docs/snippets", `${stem}.mdx`);
+  const catSlug = slugify(meta.category ?? "misc");
+  const outMdx = join(ROOT, "docs/snippets", catSlug, `${slug}.mdx`);
   await mkdir(dirname(outMdx), { recursive: true });
-  await writeFile(outMdx, mdx(meta, built));
-  console.log(`  wrote docs/snippets/${stem}.mdx (${built.length} fragments)`);
+  await writeFile(outMdx, mdx(slug, meta, built));
+  console.log(`  wrote docs/snippets/${catSlug}/${slug}.mdx (${built.length} fragments)`);
   return true;
 }
 
+// Write _category_.json so the sidebar shows ordered, nicely-labelled groups.
+async function writeCategoryMeta(categories, used) {
+  const order = categories ?? [];
+  const seen = [...used];
+  // Keep declared order first, then any leftover categories.
+  const ordered = [
+    ...order.filter((c) => seen.includes(c)),
+    ...seen.filter((c) => !order.includes(c)),
+  ];
+  for (let i = 0; i < ordered.length; i++) {
+    const cat = ordered[i];
+    const dir = join(ROOT, "docs/snippets", slugify(cat));
+    if (!existsSync(dir)) continue;
+    await writeFile(
+      join(dir, "_category_.json"),
+      JSON.stringify({ label: cat, position: i + 1 }, null, 2) + "\n",
+    );
+  }
+}
+
 async function main() {
-  const { snippets } = await import(
-    join(GENERATOR_DIR, "generators/app/snippets.js")
-  );
+  const mod = await import(join(GENERATOR_DIR, "generators/app/snippets.js"));
+  const { snippets, categories } = mod;
   const requested = process.argv.slice(2);
-  const stems = requested.length ? requested : Object.keys(snippets);
+  const slugs = requested.length ? requested : Object.keys(snippets);
 
-  console.log("▶ generating canonical IEEE template (source of truth)…");
-  const preamble = await generateBaseTemplate();
-  console.log(`  preamble: ${(preamble.match(/\\usepackage/g) || []).length} packages\n`);
-
+  await rm(join(BUILD, "_gen"), { recursive: true, force: true });
   const ok = [];
   const failed = [];
-  for (const stem of stems) {
-    const meta = snippets[stem];
+  const usedCategories = new Set();
+  for (const slug of slugs) {
+    const meta = snippets[slug];
     if (!meta) {
-      console.warn(`! ${stem}: not in snippets.js, skipping`);
+      console.warn(`! ${slug}: not in snippets.js, skipping`);
       continue;
     }
-    console.log(`▶ ${stem}`);
+    console.log(`▶ ${slug}  [${meta.category}]`);
     try {
-      if (await buildStem(stem, meta, preamble)) ok.push(stem);
+      if (await buildPackage(slug, meta)) {
+        ok.push(slug);
+        usedCategories.add(meta.category);
+      } else {
+        failed.push(slug);
+      }
     } catch (e) {
       console.warn(`  ✗ ${e.message}`);
-      failed.push(stem);
+      failed.push(slug);
     }
   }
 
+  await writeCategoryMeta(categories, usedCategories);
+
   console.log(`\nDone. built: ${ok.join(", ") || "(none)"}`);
-  if (failed.length) console.log(`failed: ${failed.join(", ")}`);
+  if (failed.length) console.log(`failed/empty: ${failed.join(", ")}`);
 }
 
 main().catch((e) => {
