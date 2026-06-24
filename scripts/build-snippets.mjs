@@ -44,10 +44,10 @@ function resolveGeneratorDir() {
   ].filter(Boolean);
   for (const c of candidates) {
     const abs = resolve(ROOT, c);
-    if (existsSync(join(abs, "generators/app/snippets.js"))) return abs;
+    if (existsSync(join(abs, "generators/app/templates"))) return abs;
   }
   throw new Error(
-    "generator checkout not found (no generators/app/snippets.js). " +
+    "generator checkout not found (no generators/app/templates). " +
       "Set GENERATOR_DIR, or run: git submodule update --init",
   );
 }
@@ -668,7 +668,8 @@ async function writeSidebarTranslations(categories, labels) {
 }
 
 async function main() {
-  const mod = await import(join(GENERATOR_DIR, "generators/app/snippets.js"));
+  // The catalog is curated here in the site repo (not the generator submodule).
+  const mod = await import(join(ROOT, "snippets.config.mjs"));
   const { snippets, categories, categoryLabels } = mod;
   const requested = process.argv.slice(2);
   const slugs = requested.length ? requested : Object.keys(snippets);

@@ -7,15 +7,14 @@ runnable complement to *The LaTeX Companion*.
 
 ## Source of truth
 
-Nothing in `docs/snippets/` or `static/img/snippets/` is hand-written. The
-snippets come from the
-[generator-latex-template](https://github.com/latextemplates/generator-latex-template)
-repository:
+Nothing in `docs/snippets/` or `static/img/snippets/` is hand-written:
 
-- **Templates:** `generators/app/templates/<stem>.preamble.en.tex` and
-  `<stem>.example.en.tex` (EJS).
-- **Metadata:** `generators/app/snippets.js` (title, CTAN package ids,
-  description).
+- **Templates** (the LaTeX source) come from the
+  [generator-latex-template](https://github.com/latextemplates/generator-latex-template)
+  submodule: `generators/app/templates/<stem>.{preamble,example}.<lang>.tex`.
+- **Catalog** (which templates become pages, plus categories, descriptions, CTAN
+  tags, German labels) is curated here in **`snippets.config.mjs`** — edit it in
+  one commit; no submodule bump needed.
 
 `scripts/build-snippets.mjs` resolves those templates under the canonical
 **IEEE conference** config, splits each example into fragments, compiles each to
@@ -32,9 +31,9 @@ a cropped SVG with the `texlive/texlive` Docker image, and writes the MDX pages.
   in this order: `GENERATOR_DIR` → `./generator-latex-template` (submodule) →
   `../generator-latex-template` (flat dev workspace).
 
-The submodule is pinned to the generator commit that carries `snippets.js`. Bump
-it with `git -C generator-latex-template pull` + commit when the generator
-changes.
+The submodule is pinned to a generator commit; Dependabot bumps it daily. Bump
+it manually with `git -C generator-latex-template pull` + commit when the
+generator templates change and you want them sooner.
 
 ## Build the snippets
 
