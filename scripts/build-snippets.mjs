@@ -212,6 +212,13 @@ rr.cleanup();
 
 // --- hosts ----------------------------------------------------------------
 
+// Space paragraphs apart (and drop first-line indent) in the rendered output, so
+// multi-paragraph examples are readable in the narrow snippet box. Set as the
+// first body content (inside standalone's varwidth / the preview box) so it
+// isn't overridden by the host's own hooks, and after \baselineskip is real.
+const PAR_SPACING =
+  "\\setlength{\\parskip}{0.8\\baselineskip}\\setlength{\\parindent}{0pt}%\n";
+
 // innerClass: when set (thesis configs), standalone hosts the fragment inside
 // that base class (e.g. scrbook) so book-only machinery like the `chapter`
 // counter exists.
@@ -223,7 +230,7 @@ function standaloneDoc(preamble, fragment, xrBase, innerClass) {
   return `\\documentclass[${cls}varwidth=15cm,border=4pt]{standalone}
 ${preamble}
 ${xr}\\begin{document}
-${fragment}
+${PAR_SPACING}${fragment}
 \\end{document}
 `;
 }
@@ -243,7 +250,7 @@ ${xr}\\usepackage[active,tightpage]{preview}
 \\setlength\\PreviewBorder{4pt}
 \\begin{document}
 \\begin{preview}
-${fragment}
+${PAR_SPACING}${fragment}
 \\end{preview}
 \\end{document}
 `;
