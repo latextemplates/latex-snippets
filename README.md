@@ -26,9 +26,15 @@ a cropped SVG with the `texlive/texlive` Docker image, and writes the MDX pages.
 - Node ≥ 18
 - Docker (for LaTeX compilation via `texlive/texlive:latest` — no host TeX Live
   needed)
-- A checkout of `generator-latex-template` (by default expected as a sibling
-  directory `../generator-latex-template`; override with `GENERATOR_DIR`). It
-  will become a git submodule once this repo is published.
+- The `generator-latex-template` git submodule (the source of truth). After
+  cloning: `git submodule update --init`, then install its deps once:
+  `npm ci --prefix generator-latex-template`. The build resolves the generator
+  in this order: `GENERATOR_DIR` → `./generator-latex-template` (submodule) →
+  `../generator-latex-template` (flat dev workspace).
+
+The submodule is pinned to the generator commit that carries `snippets.js`. Bump
+it with `git -C generator-latex-template pull` + commit when the generator
+changes.
 
 ## Build the snippets
 

@@ -1,0 +1,64 @@
+name: Build and deploy
+
+# Deploys to GitHub Pages on every push to main OR dev — so dev pushes also go
+# live (one Pages environment; the most recent push wins). Manual runs allowed.
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let the latest deploy supersede an in-flight one rather than queueing.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with the generator submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install site dependencies
+        run: npm ci
+
+      - name: Install generator dependencies (for yeoman-test)
+        # build:snippets runs the real generator out of the submodule to source
+        # the canonical preamble, so it needs the generator's own node_modules.
+        run: npm ci
+        working-directory: generator-latex-template
+
+      - name: Pre-pull TeX Live image
+        run: docker pull texlive/texlive:latest
+
+      - name: Build snippets (LaTeX → SVG via Docker) + site
+        run: npm run build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build-site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

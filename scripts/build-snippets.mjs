@@ -38,10 +38,28 @@ import ejs from "ejs";
 const execFileAsync = promisify(execFile);
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const GENERATOR_DIR = resolve(
-  ROOT,
-  process.env.GENERATOR_DIR ?? "../generator-latex-template",
-);
+
+// Locate the generator checkout. Prefer GENERATOR_DIR, then the git submodule
+// at ./generator-latex-template (CI / published repo), then a flat-workspace
+// sibling ../generator-latex-template (local dev). A candidate only counts if it
+// actually contains snippets.js — skips an un-inited (empty) submodule dir.
+function resolveGeneratorDir() {
+  const candidates = [
+    process.env.GENERATOR_DIR,
+    "generator-latex-template",
+    "../generator-latex-template",
+  ].filter(Boolean);
+  for (const c of candidates) {
+    const abs = resolve(ROOT, c);
+    if (existsSync(join(abs, "generators/app/snippets.js"))) return abs;
+  }
+  throw new Error(
+    "generator checkout not found (no generators/app/snippets.js). " +
+      "Set GENERATOR_DIR, or run: git submodule update --init",
+  );
+}
+
+const GENERATOR_DIR = resolveGeneratorDir();
 const TEMPLATES = join(GENERATOR_DIR, "generators/app/templates");
 const GEN_DIR = join(ROOT, "build", "_gen"); // reused as the LaTeX compile dir
 const LANG = "en";
