@@ -24,6 +24,9 @@ const config = {
         docs: {
           routeBasePath: "/",
           sidebarPath: "./sidebars.js",
+          // Expand all categories by default so the whole catalog is visible
+          // at a glance (categories can still be collapsed individually).
+          sidebarCollapsed: false,
           // No "Edit this page" link: snippet pages are generated, not authored.
         },
         blog: false,
