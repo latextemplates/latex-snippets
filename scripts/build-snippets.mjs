@@ -397,7 +397,7 @@ async function compileFragmentToSvg(
 
 // --- MDX ------------------------------------------------------------------
 
-function mdx(slug, meta, description, preamble, fragments) {
+function mdx(slug, meta, description, preamble, fragments, defs) {
   const title = meta.title ?? slug;
   const ctanJson = JSON.stringify(
     (meta.ctan ?? []).map((p) => ({
@@ -417,7 +417,16 @@ ${f.code}
     )
     .join("\n\n");
 
-  // Example + Preamble as tabs, Example first (default).
+  // Example + optional Definitions + Preamble as tabs, Example first (default).
+  const defsTab = defs
+    ? `<TabItem value="definitions" label="Definitions">
+
+\`\`\`latex
+${defs.trim()}
+\`\`\`
+
+</TabItem>`
+    : "";
   const preambleTab = preamble
     ? `<TabItem value="preamble" label="Preamble">
 
@@ -452,6 +461,7 @@ ${description}
 ${blocks}
 
 </TabItem>
+${defsTab}
 ${preambleTab}
 </Tabs>
 `;
@@ -511,6 +521,23 @@ async function buildPackage(slug, meta, locale) {
     }
   }
 
+  // Optional definitions block (e.g. the \newabbreviation lines from
+  // abbreviations.<lang>.tex), shown in its own tab so the example's keys make
+  // sense. Resolved as <defs>.<locale>.tex with English fallback.
+  let defsCode = null;
+  if (meta.defs) {
+    const dfile = existsSync(
+      join(TEMPLATES, `${meta.defs}.${contentLocale}.tex`),
+    )
+      ? `${meta.defs}.${contentLocale}.tex`
+      : `${meta.defs}.en.tex`;
+    try {
+      defsCode = await renderTemplate(dfile, exampleProps);
+    } catch (e) {
+      console.warn(`    ↳ defs render failed: ${e.message.split("\n")[0]}`);
+    }
+  }
+
   const description =
     locale === "de"
       ? (meta.de?.description ?? meta.description)
@@ -520,7 +547,10 @@ async function buildPackage(slug, meta, locale) {
 
   const writePage = async (built) => {
     await mkdir(dirname(outMdx), { recursive: true });
-    await writeFile(outMdx, mdx(slug, meta, description, packagePreamble, built));
+    await writeFile(
+      outMdx,
+      mdx(slug, meta, description, packagePreamble, built, defsCode),
+    );
   };
 
   // German fallback (no .de example): reuse the English example build verbatim.
