@@ -24,8 +24,7 @@ const config = {
         docs: {
           routeBasePath: "/",
           sidebarPath: "./sidebars.js",
-          editUrl:
-            "https://github.com/latextemplates/generator-latex-template/edit/main/generators/app/templates/",
+          // No "Edit this page" link: snippet pages are generated, not authored.
         },
         blog: false,
         theme: { customCss: ["./src/css/custom.css", "./src/css/snippet.css"] },

@@ -1,3 +1,37 @@
+/* Page heading with CTAN package tags next to the title. */
+.package-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.ctan-tag {
+  display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+  background: var(--ifm-color-primary-contrast-background, transparent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ctan-tag::before {
+  content: "CTAN: ";
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+.ctan-tag:hover {
+  color: #fff;
+  background: var(--ifm-color-primary);
+  text-decoration: none;
+}
+
 /* Snippet card: source on the left, rendered SVG output on the right. */
 .ltg-snippet {
   display: grid;

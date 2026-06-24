@@ -99,6 +99,11 @@ const EXAMPLE_PROPS = {
   reallatexcompiler: "lualatex",
   latexcompiler: "lualatex",
   todo: "todonotes",
+  listings: "minted",
+  enquotes: "csquotes",
+  font: "default",
+  bibtextool: "biblatex",
+  papersize: "a4",
   lang: LANG,
   language: LANG,
   texlive: 2026,
@@ -257,6 +262,12 @@ function hasUndefinedRefs(log) {
 }
 
 async function compileFragmentToSvg(slug, idx, genDir, preamble, fragment, xrBase) {
+  const svgRel = `img/snippets/${slug}-${idx}.svg`;
+  const svgOut = join(ROOT, "static", svgRel);
+  // Dev shortcut: reuse an already-compiled SVG (skip Docker) when iterating on
+  // MDX/layout. Never set in CI, which always recompiles from a clean tree.
+  if (process.env.REUSE_SVG && existsSync(svgOut)) return `/${svgRel}`;
+
   const base = `_frag-${slug}-${idx}`;
   const write = (doc) => writeFile(join(genDir, `${base}.tex`), doc);
 
@@ -292,8 +303,6 @@ async function compileFragmentToSvg(slug, idx, genDir, preamble, fragment, xrBas
     `${base}.dvi`,
   ]);
 
-  const svgRel = `img/snippets/${slug}-${idx}.svg`;
-  const svgOut = join(ROOT, "static", svgRel);
   await mkdir(dirname(svgOut), { recursive: true });
   await cp(join(genDir, `${base}.svg`), svgOut);
   return `/${svgRel}`;
@@ -301,11 +310,23 @@ async function compileFragmentToSvg(slug, idx, genDir, preamble, fragment, xrBas
 
 // --- MDX ------------------------------------------------------------------
 
-function mdx(slug, meta, fragments) {
+function mdx(slug, meta, preamble, fragments) {
   const title = meta.title ?? slug;
-  const ctan = (meta.ctan ?? [])
-    .map((p) => `[\`${p}\`](https://ctan.org/pkg/${p})`)
-    .join(" · ");
+  const ctanJson = JSON.stringify(
+    (meta.ctan ?? []).map((p) => ({
+      name: p,
+      url: `https://ctan.org/pkg/${p}`,
+    })),
+  );
+  const preambleSection = preamble
+    ? `## Preamble
+
+\`\`\`latex
+${preamble.trim()}
+\`\`\`
+
+`
+    : "";
   const blocks = fragments
     .map(
       (f) => `<Snippet svg="${f.svg}">
@@ -318,21 +339,24 @@ ${f.code}
     )
     .join("\n\n");
 
+  // hide_title: PackageHeading renders the only H1 (title + CTAN tags).
   // Flat, package-keyed canonical URL (/snippets/<package>), independent of the
-  // category folder the file lives in. The folder still drives the sidebar
-  // hierarchy; only the permalink is flattened.
+  // category folder the file lives in (the folder drives the sidebar hierarchy).
   return `---
 title: ${JSON.stringify(title)}
 slug: /snippets/${slug}
+hide_title: true
 ---
 
 import Snippet from '@site/src/components/Snippet';
+import PackageHeading from '@site/src/components/PackageHeading';
 
-# ${title}
+<PackageHeading title=${JSON.stringify(title)} ctan={${ctanJson}} />
 
 ${meta.description}
 
-${ctan ? `**CTAN:** ${ctan}\n` : ""}
+${preambleSection}## Examples
+
 ${blocks}
 `;
 }
@@ -354,6 +378,17 @@ async function buildPackage(slug, meta) {
   if (!fragments.length) {
     console.log(`  (no fragments for ${slug})`);
     return false;
+  }
+
+  // The package's own preamble snippet (\usepackage … setup), shown on the page.
+  let packagePreamble = null;
+  try {
+    packagePreamble = await renderTemplate(
+      `${stem}.preamble.${LANG}.tex`,
+      exampleProps,
+    );
+  } catch (e) {
+    console.warn(`    ↳ preamble render failed: ${e.message.split("\n")[0]}`);
   }
 
   const { genDir, preamble } = await getBase(cfg);
@@ -404,7 +439,7 @@ async function buildPackage(slug, meta) {
   const catSlug = slugify(meta.category ?? "misc");
   const outMdx = join(ROOT, "docs/snippets", catSlug, `${slug}.mdx`);
   await mkdir(dirname(outMdx), { recursive: true });
-  await writeFile(outMdx, mdx(slug, meta, built));
+  await writeFile(outMdx, mdx(slug, meta, packagePreamble, built));
   console.log(`  wrote docs/snippets/${catSlug}/${slug}.mdx (${built.length} fragments)`);
   return true;
 }
