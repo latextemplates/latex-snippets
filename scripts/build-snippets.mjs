@@ -183,12 +183,27 @@ rr.cleanup();
     maxBuffer: 32 * 1024 * 1024,
   });
 
-  const paper = await readFile(join(genDir, "paper.tex"), "utf8");
+  // Main file name depends on the document class (mirrors index.js filenames).
+  const mainFile =
+    options.documentclass === "ustutt"
+      ? "thesis-example.tex"
+      : options.documentclass === "scientific-thesis"
+        ? options.lang === "de"
+          ? "main-german.tex"
+          : "main-english.tex"
+        : "paper.tex";
+  const paper = await readFile(join(genDir, mainFile), "utf8");
   const at = paper.indexOf("\\begin{document}");
-  if (at < 0) throw new Error("no \\begin{document} in generated paper.tex");
+  if (at < 0) throw new Error(`no \\begin{document} in generated ${mainFile}`);
+  // Strip the real \documentclass (options may span multiple lines for KOMA
+  // thesis classes; an optional trailing [date] may follow), since the
+  // standalone wrapper supplies its own class.
   const preamble = paper
     .slice(0, at)
-    .replace(/\\documentclass\b[^\n]*\n/, "");
+    .replace(
+      /\\documentclass\s*\[[\s\S]*?\]\s*\{[^}]*\}(\s*\[[^\]]*\])?/,
+      "",
+    );
 
   const base = { genDir, preamble };
   baseCache.set(key, base);
@@ -197,11 +212,15 @@ rr.cleanup();
 
 // --- hosts ----------------------------------------------------------------
 
-function standaloneDoc(preamble, fragment, xrBase) {
+// innerClass: when set (thesis configs), standalone hosts the fragment inside
+// that base class (e.g. scrbook) so book-only machinery like the `chapter`
+// counter exists.
+function standaloneDoc(preamble, fragment, xrBase, innerClass) {
   const xr = xrBase
     ? `\\usepackage{xr-hyper}\n\\externaldocument{${xrBase}}\n`
     : "";
-  return `\\documentclass[varwidth=15cm,border=4pt]{standalone}
+  const cls = innerClass ? `class=${innerClass},` : "";
+  return `\\documentclass[${cls}varwidth=15cm,border=4pt]{standalone}
 ${preamble}
 ${xr}\\begin{document}
 ${fragment}
@@ -209,8 +228,30 @@ ${fragment}
 `;
 }
 
-function contextDoc(preamble, exampleFull) {
-  return `\\documentclass[a4paper,10pt]{article}
+// Host for thesis configs: the heavy thesis preamble installs page-layout
+// machinery (scrlayer-scrpage) that overflows in a standalone page. The preview
+// package ships only the wrapped fragment via its own shipout, bypassing the
+// normal page output routine entirely, while a real book class keeps the
+// chapter counter etc. available.
+function previewDoc(preamble, fragment, xrBase, innerClass) {
+  const xr = xrBase
+    ? `\\usepackage{xr-hyper}\n\\externaldocument{${xrBase}}\n`
+    : "";
+  return `\\documentclass[a4paper,10pt]{${innerClass}}
+${preamble}
+${xr}\\usepackage[active,tightpage]{preview}
+\\setlength\\PreviewBorder{4pt}
+\\begin{document}
+\\begin{preview}
+${fragment}
+\\end{preview}
+\\end{document}
+`;
+}
+
+function contextDoc(preamble, exampleFull, innerClass) {
+  const cls = innerClass ?? "article";
+  return `\\documentclass[a4paper,10pt]{${cls}}
 ${preamble}
 \\begin{document}
 ${exampleFull}
@@ -290,7 +331,15 @@ function hasUndefinedRefs(log) {
   return /undefined reference|Reference `[^']*' .*undefined/i.test(log);
 }
 
-async function compileFragmentToSvg(svgSlug, idx, genDir, preamble, fragment, xrBase) {
+async function compileFragmentToSvg(
+  svgSlug,
+  idx,
+  genDir,
+  preamble,
+  fragment,
+  xrBase,
+  innerClass,
+) {
   const svgRel = `img/snippets/${svgSlug}-${idx}.svg`;
   const svgOut = join(ROOT, "static", svgRel);
   // Dev shortcut: reuse an already-compiled SVG (skip Docker) when iterating on
@@ -299,9 +348,11 @@ async function compileFragmentToSvg(svgSlug, idx, genDir, preamble, fragment, xr
 
   const base = `_frag-${svgSlug}-${idx}`;
   const write = (doc) => writeFile(join(genDir, `${base}.tex`), doc);
+  // Thesis configs use the preview host (bypasses the page output routine).
+  const host = innerClass ? previewDoc : standaloneDoc;
 
   let firstErr = null;
-  await write(standaloneDoc(preamble, fragment, null));
+  await write(host(preamble, fragment, null, innerClass));
   try {
     await compileTwice(genDir, base);
   } catch {
@@ -311,7 +362,7 @@ async function compileFragmentToSvg(svgSlug, idx, genDir, preamble, fragment, xr
     xrBase &&
     (firstErr !== null || hasUndefinedRefs(await readLog(genDir, base)));
   if (needsXr) {
-    await write(standaloneDoc(preamble, fragment, xrBase));
+    await write(host(preamble, fragment, xrBase, innerClass));
     try {
       await compileTwice(genDir, base);
     } catch {
@@ -480,6 +531,10 @@ async function buildPackage(slug, meta, locale) {
   // Compile (English, or a genuine localized example). Localized examples get a
   // locale-suffixed SVG slug so they don't clash with the English ones.
   const svgSlug = localized ? `${slug}.${locale}` : slug;
+  // Thesis configs need a book base class (chapter counter, etc.).
+  const innerClass = ["scientific-thesis", "ustutt"].includes(cfg.documentclass)
+    ? "scrbook"
+    : null;
   const { genDir, preamble } = await getBase(cfg, contentLocale);
 
   // Context document for xr-hyper (only if the example defines labels).
@@ -494,7 +549,7 @@ async function buildPackage(slug, meta, locale) {
     const ctxBase = `_ctx-${svgSlug}`;
     await writeFile(
       join(genDir, `${ctxBase}.tex`),
-      contextDoc(preamble, exampleFull),
+      contextDoc(preamble, exampleFull, innerClass),
     );
     try {
       await compileTwice(genDir, ctxBase);
@@ -515,6 +570,7 @@ async function buildPackage(slug, meta, locale) {
         preamble,
         fragments[i],
         xrBase,
+        innerClass,
       );
       console.log("svg ✓");
       built.push({ code: fragments[i], svg });
