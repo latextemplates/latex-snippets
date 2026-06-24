@@ -86,6 +86,7 @@ const IEEE_OPTIONS = {
 const EXAMPLE_PROPS = {
   documentclass: "ieee",
   ieeevariant: "conference",
+  ieeecompsoc: false,
   heading1: "\\section",
   heading2: "\\subsection",
   heading3: "\\subsubsection",
@@ -374,6 +375,15 @@ async function buildPackage(slug, meta) {
   const stem = meta.stem ?? slug;
   const cfg = meta.config ?? {};
   const exampleProps = { ...EXAMPLE_PROPS, ...cfg };
+  // Derive the quote commands from the (possibly overridden) enquotes switch,
+  // mirroring index.js, so e.g. the textcmds page uses \qq instead of \enquote.
+  if (exampleProps.enquotes === "textcmds") {
+    exampleProps.bquote = "\\qq{";
+    exampleProps.equote = "}";
+  } else if (exampleProps.enquotes === "csquotes") {
+    exampleProps.bquote = "\\enquote{";
+    exampleProps.equote = "}";
+  }
 
   const exampleRaw = await renderTemplate(
     `${stem}.example.${LANG}.tex`,
@@ -480,6 +490,12 @@ async function main() {
   const slugs = requested.length ? requested : Object.keys(snippets);
 
   await rm(join(BUILD, "_gen"), { recursive: true, force: true });
+  // Full build (no explicit packages): clear generated pages so removed/renamed
+  // packages and stale categories don't linger. SVGs are left in place so
+  // REUSE_SVG can still skip recompiles.
+  if (!requested.length) {
+    await rm(join(ROOT, "docs/snippets"), { recursive: true, force: true });
+  }
   const ok = [];
   const failed = [];
   const usedCategories = new Set();
