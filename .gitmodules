@@ -1,4 +1,4 @@
 [submodule "generator-latex-template"]
 	path = generator-latex-template
 	url = https://github.com/latextemplates/generator-latex-template.git
-	branch = homepage-with-hints
+	branch = main
