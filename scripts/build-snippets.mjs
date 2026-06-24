@@ -318,8 +318,12 @@ ${f.code}
     )
     .join("\n\n");
 
+  // Flat, package-keyed canonical URL (/snippets/<package>), independent of the
+  // category folder the file lives in. The folder still drives the sidebar
+  // hierarchy; only the permalink is flattened.
   return `---
 title: ${JSON.stringify(title)}
+slug: /snippets/${slug}
 ---
 
 import Snippet from '@site/src/components/Snippet';
