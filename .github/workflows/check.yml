@@ -1,0 +1,44 @@
+name: Check
+
+# Build-only check (no deploy) so PRs — including Dependabot's — get a status
+# check that automerge.yml's --auto merge can wait on.
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.head_ref || github.ref }}"
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Git repository (with the generator submodule)
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install site dependencies
+        run: npm ci
+
+      - name: Install generator dependencies (for yeoman-test)
+        # build:snippets runs the real generator out of the submodule to source
+        # the canonical preamble, so it needs the generator's own node_modules.
+        run: npm ci
+        working-directory: generator-latex-template
+
+      - name: Pre-pull TeX Live image
+        run: docker pull texlive/texlive:latest
+
+      - name: Build snippets (LaTeX → SVG via Docker) + site
+        run: npm run build

@@ -1,10 +1,12 @@
 name: Build and deploy
 
-# Deploys to GitHub Pages on every push to main (one Pages environment; the most
-# recent push wins). Manual runs allowed.
+# Deploys to GitHub Pages on every push to main or update-ltg (one Pages
+# environment; the most recent push wins — an update-ltg push temporarily
+# replaces the live site with the in-progress LTG refinement until main is
+# pushed again). Manual runs allowed.
 on:
   push:
-    branches: [main]
+    branches: [main, update-ltg]
   workflow_dispatch:
 
 permissions:
