@@ -203,6 +203,11 @@ rr.cleanup();
     .replace(
       /\\documentclass\s*\[[\s\S]*?\]\s*\{[^}]*\}(\s*\[[^\]]*\])?/,
       "",
+    )
+    // Fragments are compiled to DVI: drop what forces or needs PDF mode.
+    .replace(
+      /^.*(\\pdfoutput=1|\\usepackage\{embedfile\}|\\embedfile\[).*\n/gm,
+      "",
     );
 
   const base = { genDir, preamble };
