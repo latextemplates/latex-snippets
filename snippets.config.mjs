@@ -119,8 +119,7 @@ export const snippets = {
   },
   "zref-clever": {
     category: "Cross-References",
-    stem: "crossref",
-    preambleStem: "zref-clever",
+    stem: "zref-clever",
     ctan: ["zref-clever"],
     description:
       "Cross-references that prepend the right label (Figure, Section, …) automatically and merge ranges — compatible with tagged (accessible) PDFs.",
@@ -132,8 +131,7 @@ export const snippets = {
   },
   cleveref: {
     category: "Cross-References",
-    stem: "crossref",
-    preambleStem: "cleveref",
+    stem: "cleveref",
     ctan: ["cleveref"],
     description:
       ":::warning[Outdated]\n\ncleveref is only partially compatible with tagged (accessible) PDFs. Use its successor [zref-clever](zref-clever) for new documents.\n\n:::\n\nCross-references that prepend the right label (Figure, Section, …) automatically and merge ranges.",
