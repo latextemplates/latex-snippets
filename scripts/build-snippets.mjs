@@ -510,7 +510,7 @@ async function buildPackage(slug, meta, locale) {
   const cleveref = exampleProps.crossref === "cleveref";
   exampleProps.crossref = cleveref ? "cleveref" : "zref-clever";
   exampleProps.cref = cleveref ? "\\cref" : "\\zcref";
-  exampleProps.Cref = cleveref ? "\\Cref" : "\\zcref[S]";
+  exampleProps.Cref = cleveref ? "\\Cref" : "\\Zcref";
   exampleProps.vref = cleveref ? "\\vref" : "\\zvref";
   exampleProps.Vref = cleveref ? "\\Vref" : "\\zvref[S]";
 
