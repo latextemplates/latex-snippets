@@ -117,15 +117,28 @@ export const snippets = {
         "TODOs und Review-Kommentare als PDF-Anmerkungen und hervorgehobener Text (\\textcomment, \\sidecomment, \\change).",
     },
   },
+  "zref-clever": {
+    category: "Cross-References",
+    stem: "zref-clever",
+    ctan: ["zref-clever"],
+    description:
+      "Cross-references that prepend the right label (Figure, Section, …) automatically and merge ranges — compatible with tagged (accessible) PDFs.",
+    config: { crossref: "zref-clever" },
+    de: {
+      description:
+        "Querverweise, die automatisch die richtige Bezeichnung (Abbildung, Abschnitt, …) voranstellen und Bereiche zusammenfassen – kompatibel mit getaggten (barrierefreien) PDFs.",
+    },
+  },
   cleveref: {
     category: "Cross-References",
     stem: "cleveref",
     ctan: ["cleveref"],
     description:
-      "Cross-references that prepend the right label (Figure, Section, …) automatically and merge ranges.",
+      ":::warning[Outdated]\n\ncleveref is only partially compatible with tagged (accessible) PDFs. Use its successor [zref-clever](zref-clever) for new documents.\n\n:::\n\nCross-references that prepend the right label (Figure, Section, …) automatically and merge ranges.",
+    config: { crossref: "cleveref" },
     de: {
       description:
-        "Querverweise, die automatisch die richtige Bezeichnung (Abbildung, Abschnitt, …) voranstellen und Bereiche zusammenfassen.",
+        ":::warning[Veraltet]\n\ncleveref ist nur teilweise mit getaggten (barrierefreien) PDFs kompatibel. Für neue Dokumente den Nachfolger [zref-clever](zref-clever) verwenden.\n\n:::\n\nQuerverweise, die automatisch die richtige Bezeichnung (Abbildung, Abschnitt, …) voranstellen und Bereiche zusammenfassen.",
     },
   },
   siunitx: {
