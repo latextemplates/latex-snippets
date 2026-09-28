@@ -228,8 +228,9 @@ const PAR_SPACING =
 // that base class (e.g. scrbook) so book-only machinery like the `chapter`
 // counter exists.
 function standaloneDoc(preamble, fragment, xrBase, innerClass) {
+  // xr-hyper imports \label targets, zref-xr the zref labels (zref-clever).
   const xr = xrBase
-    ? `\\usepackage{xr-hyper}\n\\externaldocument{${xrBase}}\n`
+    ? `\\usepackage{xr-hyper}\n\\externaldocument{${xrBase}}\n\\usepackage{zref-xr}\n\\zexternaldocument{${xrBase}}\n`
     : "";
   const cls = innerClass ? `class=${innerClass},` : "";
   return `\\documentclass[${cls}varwidth=15cm,border=4pt]{standalone}
@@ -246,8 +247,9 @@ ${PAR_SPACING}${fragment}
 // normal page output routine entirely, while a real book class keeps the
 // chapter counter etc. available.
 function previewDoc(preamble, fragment, xrBase, innerClass) {
+  // xr-hyper imports \label targets, zref-xr the zref labels (zref-clever).
   const xr = xrBase
-    ? `\\usepackage{xr-hyper}\n\\externaldocument{${xrBase}}\n`
+    ? `\\usepackage{xr-hyper}\n\\externaldocument{${xrBase}}\n\\usepackage{zref-xr}\n\\zexternaldocument{${xrBase}}\n`
     : "";
   return `\\documentclass[a4paper,10pt]{${innerClass}}
 ${preamble}
@@ -504,6 +506,13 @@ async function buildPackage(slug, meta, locale) {
     exampleProps.bquote = "\\enquote{";
     exampleProps.equote = "}";
   }
+  // Same for the reference commands (index.js: the `crossref` switch).
+  const cleveref = exampleProps.crossref === "cleveref";
+  exampleProps.crossref = cleveref ? "cleveref" : "zref-clever";
+  exampleProps.cref = cleveref ? "\\cref" : "\\zcref";
+  exampleProps.Cref = cleveref ? "\\Cref" : "\\Zcref";
+  exampleProps.vref = cleveref ? "\\vref" : "\\zvref";
+  exampleProps.Vref = cleveref ? "\\Vref" : "\\zvref[S]";
 
   const fragments = extractFragments(
     await renderTemplate(exampleSrc.file, exampleProps),
