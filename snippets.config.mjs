@@ -50,6 +50,7 @@ export const categories = [
   "Notes",
   "Typography",
   "Glossaries",
+  "More Hints",
 ];
 
 // German labels for the categories above (sidebar group titles in the de locale).
@@ -65,6 +66,7 @@ export const categoryLabels = {
     Notes: "Notizen",
     Typography: "Typografie",
     Glossaries: "Glossare",
+    "More Hints": "Weitere Hinweise",
   },
 };
 
@@ -220,8 +222,56 @@ export const snippets = {
         "Professionelle Tabellenlinien (\\toprule, \\midrule, \\bottomrule) für saubere, gut lesbare Tabellen.",
     },
   },
-  paragraphs: {
+  // Typography: load these and the text just looks right. Preamble-only pages
+  // (no example) — these packages act on page breaks and spacing, which a
+  // cropped snippet cannot show.
+  microtype: {
     category: "Typography",
+    stem: "microtype",
+    ctan: ["microtype"],
+    description:
+      "Character protrusion and font expansion: even text colour, fewer hyphenations — the single biggest typographic upgrade.",
+    de: {
+      description:
+        "Optischer Randausgleich und Fontexpansion: gleichmäßiger Grauwert, weniger Trennungen – die größte typografische Verbesserung durch ein einzelnes Paket.",
+    },
+  },
+  "widows-orphans": {
+    category: "Typography",
+    stem: "nowidow",
+    title: "Widows & orphans",
+    ctan: ["lua-widow-control", "nowidow"],
+    description:
+      "No lone paragraph line at the top or bottom of a page. LuaLaTeX: lua-widow-control lengthens or shortens the paragraph by one line instead of leaving an empty line; pdfLaTeX: nowidow.",
+    de: {
+      description:
+        "Keine Hurenkinder und Schusterjungen (einzelne Absatzzeilen am Seitenanfang oder -ende). LuaLaTeX: lua-widow-control verlängert oder verkürzt den Absatz um eine Zeile statt eine Leerzeile zu lassen; pdfLaTeX: nowidow.",
+    },
+  },
+  impnattypo: {
+    category: "Typography",
+    stem: "impnattypo",
+    ctan: ["impnattypo"],
+    description:
+      "No lone short word as the last line of a paragraph (LuaLaTeX only — the pdfTeX fallback loosens word spacing everywhere).",
+    de: {
+      description:
+        "Kein einzelnes kurzes Wort als letzte Absatzzeile (nur LuaLaTeX – der pdfTeX-Fallback lockert den Wortabstand überall).",
+    },
+  },
+  xurl: {
+    category: "Typography",
+    stem: "url",
+    ctan: ["xurl", "url"],
+    description:
+      "Long URLs may break after any character (and at hyphens), so they no longer run into the margin.",
+    de: {
+      description:
+        "Lange URLs dürfen nach jedem Zeichen (und an Bindestrichen) umbrechen und ragen nicht mehr in den Rand.",
+    },
+  },
+  paragraphs: {
+    category: "More Hints",
     stem: "paragraphs",
     title: "Paragraphs",
     ctan: [],
@@ -233,7 +283,7 @@ export const snippets = {
     },
   },
   hyphenation: {
-    category: "Typography",
+    category: "More Hints",
     stem: "hyphenation",
     title: "Hyphenation",
     ctan: [],
