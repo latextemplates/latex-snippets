@@ -434,8 +434,16 @@ ${defs.trim()}
 
 </TabItem>`
     : "";
+  // Preamble-only pages (no example, e.g. microtype) have no Example tab.
+  const exampleTab = fragments.length
+    ? `<TabItem value="example" label="Example" default>
+
+${blocks}
+
+</TabItem>`
+    : "";
   const preambleTab = preamble
-    ? `<TabItem value="preamble" label="Preamble">
+    ? `<TabItem value="preamble" label="Preamble"${fragments.length ? "" : " default"}>
 
 \`\`\`latex
 ${preamble.trim()}
@@ -463,11 +471,7 @@ import TabItem from '@theme/TabItem';
 ${description}
 
 <Tabs>
-<TabItem value="example" label="Example" default>
-
-${blocks}
-
-</TabItem>
+${exampleTab}
 ${defsTab}
 ${preambleTab}
 </Tabs>
@@ -484,11 +488,13 @@ async function buildPackage(slug, meta, locale) {
   const cfg = meta.config ?? {};
 
   const exampleSrc = resolveSrc(stem, "example", locale);
-  if (!exampleSrc) {
-    console.log(`  (no example for stem '${stem}'; skipping)`);
+  const preambleSrc = resolveSrc(meta.preambleStem ?? stem, "preamble", locale);
+  if (!exampleSrc && !preambleSrc) {
+    console.log(`  (no example or preamble for stem '${stem}'; skipping)`);
     return false;
   }
-  const localized = exampleSrc.localized; // true → genuine .de content
+  // No example (e.g. microtype): the page shows just the preamble snippet.
+  const localized = (exampleSrc ?? preambleSrc).localized; // true → genuine .de content
   const contentLocale = localized ? locale : "en";
 
   const exampleProps = {
@@ -514,10 +520,10 @@ async function buildPackage(slug, meta, locale) {
   exampleProps.vref = cleveref ? "\\vref" : "\\zvref";
   exampleProps.Vref = cleveref ? "\\Vref" : "\\zvref[S]";
 
-  const fragments = extractFragments(
-    await renderTemplate(exampleSrc.file, exampleProps),
-  );
-  if (!fragments.length) {
+  const fragments = exampleSrc
+    ? extractFragments(await renderTemplate(exampleSrc.file, exampleProps))
+    : [];
+  if (exampleSrc && !fragments.length) {
     console.log(`  (no fragments for ${slug})`);
     return false;
   }
@@ -526,7 +532,6 @@ async function buildPackage(slug, meta, locale) {
   // Uses the .de preamble where available even when the example falls back to en
   // (e.g. cleveref/siunitx have a German preamble but English example).
   let packagePreamble = null;
-  const preambleSrc = resolveSrc(meta.preambleStem ?? stem, "preamble", locale);
   if (preambleSrc) {
     try {
       packagePreamble = await renderTemplate(preambleSrc.file, exampleProps);
@@ -566,6 +571,12 @@ async function buildPackage(slug, meta, locale) {
       mdx(slug, meta, description, packagePreamble, built, defsCode),
     );
   };
+
+  if (!exampleSrc) {
+    await writePage([]);
+    console.log(`  wrote ${locale}/${catSlug}/${slug}.mdx (preamble only)`);
+    return true;
+  }
 
   // German fallback (no .de example): reuse the English example build verbatim.
   if (locale !== "en" && !localized) {
