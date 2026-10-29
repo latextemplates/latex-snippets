@@ -193,7 +193,9 @@ rr.cleanup();
           : "main-english.tex"
         : "paper.tex";
   const paper = await readFile(join(genDir, mainFile), "utf8");
-  const at = paper.indexOf("\\begin{document}");
+  // Match the real \begin{document} at line start: the generated header comment
+  // mentions it too ("The content starts in line N (\begin{document})").
+  const at = paper.search(/^\\begin\{document\}/m);
   if (at < 0) throw new Error(`no \\begin{document} in generated ${mainFile}`);
   // Strip the real \documentclass (options may span multiple lines for KOMA
   // thesis classes; an optional trailing [date] may follow), since the
