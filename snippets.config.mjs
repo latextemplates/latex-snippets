@@ -168,7 +168,7 @@ export const snippets = {
   outerquote: {
     category: "Quotations",
     stem: "csquotes",
-    title: 'Plain "quotes"',
+    title: "Plain “quotes”",
     ctan: ["csquotes"],
     description:
       'Plain double quotes ("text") become proper, language-aware quotation marks via csquotes\' \\MakeOuterQuote.',
