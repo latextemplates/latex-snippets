@@ -165,6 +165,19 @@ export const snippets = {
         "Kontextsensitive, sprachabhängige Anführungszeichen über \\enquote statt fest kodierter Zeichen.",
     },
   },
+  outerquote: {
+    category: "Quotations",
+    stem: "csquotes",
+    title: "Plain “quotes”",
+    ctan: ["csquotes"],
+    description:
+      'Plain double quotes ("text") become proper, language-aware quotation marks via csquotes\' \\MakeOuterQuote.',
+    config: { tweakouterquote: "outerquote" },
+    de: {
+      description:
+        'Einfache doppelte Anführungszeichen ("Text") werden über \\MakeOuterQuote von csquotes zu korrekten, sprachabhängigen Anführungszeichen.',
+    },
+  },
   paralist: {
     category: "Lists",
     stem: "paralist",
