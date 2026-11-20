@@ -266,6 +266,7 @@ export const snippets = {
     },
   },
   tabularray: {
+    gadr: "table-layout",
     category: "Tables",
     stem: "tabularray",
     ctan: ["tabularray"],
