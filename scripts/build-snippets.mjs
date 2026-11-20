@@ -207,8 +207,9 @@ rr.cleanup();
       "",
     )
     // Fragments are compiled to DVI: drop what forces or needs PDF mode.
+    // The standalone host is not IEEEtran: drop the IEEEtran-internal compsoc font switch.
     .replace(
-      /^.*(\\pdfoutput=1|\\usepackage\{embedfile\}|\\embedfile\[).*\n/gm,
+      /^.*(\\pdfoutput=1|\\usepackage\{embedfile\}|\\embedfile\[|\\@IEEEcompsocnotconfonly).*\n/gm,
       "",
     );
 
