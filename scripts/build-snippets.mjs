@@ -30,7 +30,7 @@ import { existsSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import ejs from "ejs";
 
 const execFileAsync = promisify(execFile);
@@ -55,6 +55,12 @@ function resolveGeneratorDir() {
 const GENERATOR_DIR = resolveGeneratorDir();
 const TEMPLATES = join(GENERATOR_DIR, "generators/app/templates");
 const BUILD = join(ROOT, "build");
+// Pages the generator does not cover take a complete MWE from the GADR submodule.
+const GADR = join(ROOT, "gadr-latex-packages");
+const GADR_URL = "https://github.com/latextemplates/gadr-latex-packages/blob/main";
+// The MWE's page setup (sized to crop its PNG) is not part of the snippet.
+const GADR_PAGE_SETUP =
+  /\\documentclass(\[[^\]]*\])?\{[^}]*\}|\\usepackage\[[^\]]*\]\{geometry\}|\\pagestyle\{empty\}/g;
 
 const LANG = "en"; // default locale used by the prop templates below
 
@@ -419,7 +425,18 @@ async function compileFragmentToSvg(
 
 // --- MDX ------------------------------------------------------------------
 
-function mdx(slug, meta, description, preamble, fragments, defs) {
+// The GADR (why this package, which alternatives) the page links to.
+function gadrProp(meta) {
+  const name = meta.gadr ?? (meta.mwe && dirname(meta.mwe));
+  return name ? ` gadr=${JSON.stringify(`${GADR_URL}/${name}.md`)}` : "";
+}
+
+const MWE_NOTE = {
+  en: "This example comes from the decision record; the templates do not contain it.",
+  de: "Dieses Beispiel stammt aus dem Decision Record; die Templates enthalten es nicht.",
+};
+
+function mdx(slug, meta, locale, description, preamble, fragments, defs) {
   const title = meta.title ?? slug;
   const ctanJson = JSON.stringify(
     (meta.ctan ?? []).map((p) => ({
@@ -481,9 +498,9 @@ import PackageHeading from '@site/src/components/PackageHeading';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-<PackageHeading title=${JSON.stringify(title)} ctan={${ctanJson}} />
+<PackageHeading title=${JSON.stringify(title)} ctan={${ctanJson}}${gadrProp(meta)} />
 
-${description}
+${description}${meta.mwe ? `\n\n${MWE_NOTE[locale]}` : ""}
 
 <Tabs>
 ${exampleTab}
@@ -498,7 +515,55 @@ ${preambleTab}
 // fragments were skipped — instead of recompiling.
 const enExampleBuilt = new Map();
 
+// A GADR MWE is compiled as is (its own class and packages), so the SVG shows
+// exactly what the decision record shows. One fragment: the document body.
+async function buildMwe(slug, meta, locale) {
+  const src = await readFile(join(GADR, meta.mwe), "utf8");
+  const at = src.search(/^\\begin\{document\}/m);
+  if (at < 0) throw new Error(`no \\begin{document} in ${meta.mwe}`);
+  const preamble = src.slice(0, at).replace(GADR_PAGE_SETUP, "").replace(/^\s*\n/gm, "");
+  const code = src
+    .slice(at)
+    .replace(/^\\begin\{document\}\n/, "")
+    .replace(/\\end\{document\}[\s\S]*$/, "")
+    .trim();
+
+  const svgRel = `img/snippets/${slug}-0.svg`;
+  const svgOut = join(ROOT, "static", svgRel);
+  if (!(process.env.REUSE_SVG && existsSync(svgOut))) {
+    // Copy the whole MWE directory: an MWE may read a sibling file (e.g. a .bib).
+    const dir = join(BUILD, "_gen", `gadr-${slug}`);
+    await cp(join(GADR, dirname(meta.mwe)), dir, { recursive: true });
+    const base = basename(meta.mwe, ".tex");
+    try {
+      // three runs, as the GADR's regenerate.sh: e.g. nicematrix reads the previous .aux
+      for (let pass = 0; pass < 3; pass++) {
+        await dockerTexlive(dir, ["dvilualatex", "-interaction=nonstopmode", "-halt-on-error", `${base}.tex`]);
+      }
+      await dockerTexlive(dir, ["dvisvgm", "--no-fonts", "--bbox=4pt", `--output=${base}.svg`, `${base}.dvi`]);
+    } catch {
+      console.warn(`    ↳ compile failed (${meta.mwe}):\n      ${texError(await readLog(dir, base)).replace(/\n/g, "\n      ")}`);
+      return false;
+    }
+    await mkdir(dirname(svgOut), { recursive: true });
+    await cp(join(dir, `${base}.svg`), svgOut);
+  }
+
+  const description =
+    locale === "de" ? (meta.de?.description ?? meta.description) : meta.description;
+  const catSlug = slugify(meta.category ?? "misc");
+  const outMdx = join(DOCS[locale], catSlug, `${slug}.mdx`);
+  await mkdir(dirname(outMdx), { recursive: true });
+  await writeFile(
+    outMdx,
+    mdx(slug, meta, locale, description, preamble, [{ code, svg: `/${svgRel}` }], null),
+  );
+  console.log(`  wrote ${locale}/${catSlug}/${slug}.mdx (GADR MWE)`);
+  return true;
+}
+
 async function buildPackage(slug, meta, locale) {
+  if (meta.mwe) return buildMwe(slug, meta, locale);
   const stem = meta.stem ?? slug;
   const cfg = meta.config ?? {};
 
@@ -583,7 +648,7 @@ async function buildPackage(slug, meta, locale) {
     await mkdir(dirname(outMdx), { recursive: true });
     await writeFile(
       outMdx,
-      mdx(slug, meta, description, packagePreamble, built, defsCode),
+      mdx(slug, meta, locale, description, packagePreamble, built, defsCode),
     );
   };
 
