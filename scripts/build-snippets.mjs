@@ -211,7 +211,11 @@ rr.cleanup();
     .replace(
       /^.*(\\pdfoutput=1|\\usepackage\{embedfile\}|\\embedfile\[|\\@IEEEcompsocnotconfonly).*\n/gm,
       "",
-    );
+    )
+    // No snippet shows the cover page. ponytail: the generator uses options of the
+    // template's vendored cover package (5.3.0 preview) that TeX Live lacks; keep
+    // dropping it until that version is on CTAN.
+    .replace(/\\usepackage\[[^\]]*\]\{scientific-thesis-cover\}\n?/, "");
 
   const base = { genDir, preamble };
   baseCache.set(key, base);
@@ -227,6 +231,14 @@ rr.cleanup();
 const PAR_SPACING =
   "\\setlength{\\parskip}{0.8\\baselineskip}\\setlength{\\parindent}{0pt}%\n";
 
+// A snippet is a box, where floats are not allowed: table and figure stay in
+// place (\caption still works through \@captype).
+const NO_FLOATS = `\\makeatletter
+\\renewenvironment{table}[1][]{\\def\\@captype{table}}{}
+\\renewenvironment{figure}[1][]{\\def\\@captype{figure}}{}
+\\makeatother
+`;
+
 // innerClass: when set (thesis configs), standalone hosts the fragment inside
 // that base class (e.g. scrbook) so book-only machinery like the `chapter`
 // counter exists.
@@ -238,7 +250,7 @@ function standaloneDoc(preamble, fragment, xrBase, innerClass) {
   const cls = innerClass ? `class=${innerClass},` : "";
   return `\\documentclass[${cls}varwidth=15cm,border=4pt]{standalone}
 ${preamble}
-${xr}\\begin{document}
+${xr}${NO_FLOATS}\\begin{document}
 ${PAR_SPACING}${fragment}
 \\end{document}
 `;
@@ -258,7 +270,7 @@ function previewDoc(preamble, fragment, xrBase, innerClass) {
 ${preamble}
 ${xr}\\usepackage[active,tightpage]{preview}
 \\setlength\\PreviewBorder{4pt}
-\\begin{document}
+${NO_FLOATS}\\begin{document}
 \\begin{preview}
 ${PAR_SPACING}${fragment}
 \\end{preview}
