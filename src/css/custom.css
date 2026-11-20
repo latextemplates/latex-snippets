@@ -9,3 +9,14 @@
   --ifm-color-primary-lightest: #3f9d43;
   --ifm-code-font-size: 90%;
 }
+
+/* Paragraph-level line breaking and hyphenation for prose (lang is set per locale).
+   Compared against Knuth-Plass (bramstein/typeset) on the screenshots branch. */
+.markdown p,
+.markdown li {
+  text-wrap: pretty;
+  hyphens: auto;
+}
+.markdown code {
+  hyphens: manual;
+}
