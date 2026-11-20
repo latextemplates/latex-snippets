@@ -16,7 +16,7 @@
 //     into code+output fragments. Reliable package→fragment mapping.
 //
 // Each fragment compiles (two passes, standalone host; xr-hyper fallback for
-// out-of-block cross-references) to a cropped DVI via the texlive/texlive Docker
+// out-of-block cross-references) to a cropped DVI via the dante-ev/texlive Docker
 // image, then to SVG with dvisvgm (DVI route: dvisvgm --pdf needs GS<10.01).
 //
 // Generated outputs (docs/snippets/**, static/img/snippets/*.svg, build/) are
@@ -322,7 +322,7 @@ async function dockerTexlive(workdir, args) {
       "HOME=/workdir",
       "-v",
       `${workdir}:/workdir`,
-      "texlive/texlive:latest",
+      "ghcr.io/dante-ev/texlive:edge",
       ...args,
     ],
     { cwd: workdir, maxBuffer: 32 * 1024 * 1024 },
