@@ -235,6 +235,19 @@ export const snippets = {
         "Professionelle Tabellenlinien (\\toprule, \\midrule, \\bottomrule) für saubere, gut lesbare Tabellen.",
     },
   },
+  tabularray: {
+    category: "Tables",
+    stem: "tabularray",
+    ctan: ["tabularray"],
+    // The example is part of the theses' LaTeX hints.
+    config: { documentclass: "scientific-thesis" },
+    description:
+      "Tables whose layout (columns, header rows, cells spanning rows or columns, row colors) is set once in front of the content.",
+    de: {
+      description:
+        "Tabellen, deren Layout (Spalten, Kopfzeilen, Zellen über mehrere Zeilen oder Spalten, Zeilenfarben) einmal vor dem Inhalt festgelegt wird.",
+    },
+  },
   // Typography: load these and the text just looks right. Preamble-only pages
   // (no example) — these packages act on page breaks and spacing, which a
   // cropped snippet cannot show.
