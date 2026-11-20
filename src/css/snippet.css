@@ -30,6 +30,10 @@
   font-weight: 400;
 }
 
+.gadr-tag::before {
+  content: none;
+}
+
 .ctan-tag:hover {
   color: #fff;
   background: var(--ifm-color-primary);

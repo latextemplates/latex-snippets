@@ -35,6 +35,11 @@
 //                 active one (e.g. { listings: "listings" }, { todo: "pdfcomment" })
 //   de          — German overrides: { description }
 //   companion   — optional verified cross-reference to "The LaTeX Companion"
+//   gadr        — decision record in gadr-latex-packages (file name without .md);
+//                 shown as a "GADR" badge linking to it
+//   mwe         — for a package the generator does not provide: an MWE in the
+//                 gadr-latex-packages submodule (e.g. "change-tracking/changes.tex"),
+//                 compiled as is; replaces stem/config; gadr defaults to its directory
 //
 // This is a seed batch. Grow as we go.
 
@@ -72,6 +77,7 @@ export const categoryLabels = {
 
 export const snippets = {
   minted: {
+    gadr: "source-code-listings",
     category: "Source Code",
     stem: "minted",
     ctan: ["minted"],
@@ -84,6 +90,7 @@ export const snippets = {
     },
   },
   listings: {
+    gadr: "source-code-listings",
     category: "Source Code",
     stem: "listings",
     ctan: ["listings"],
@@ -96,6 +103,7 @@ export const snippets = {
     },
   },
   todonotes: {
+    gadr: "todo-package",
     category: "Comments & TODOs",
     stem: "todos",
     ctan: ["todonotes"],
@@ -108,6 +116,7 @@ export const snippets = {
     },
   },
   pdfcomment: {
+    gadr: "todo-package",
     category: "Comments & TODOs",
     stem: "todos",
     ctan: ["pdfcomment"],
@@ -119,7 +128,19 @@ export const snippets = {
         "TODOs und Review-Kommentare als PDF-Anmerkungen und hervorgehobener Text (\\textcomment, \\sidecomment, \\change).",
     },
   },
+  changes: {
+    category: "Comments & TODOs",
+    mwe: "change-tracking/changes.tex",
+    ctan: ["changes"],
+    description:
+      "Additions, deletions, and comments marked per author.",
+    de: {
+      description:
+        "Ergänzungen, Streichungen und Kommentare je Autor markiert.",
+    },
+  },
   "zref-clever": {
+    gadr: "cross-references",
     category: "Cross-References",
     stem: "zref-clever",
     ctan: ["zref-clever"],
@@ -132,6 +153,7 @@ export const snippets = {
     },
   },
   cleveref: {
+    gadr: "cross-references",
     category: "Cross-References",
     stem: "cleveref",
     ctan: ["cleveref"],
@@ -144,6 +166,7 @@ export const snippets = {
     },
   },
   siunitx: {
+    gadr: "numbers-and-units",
     category: "Numbers & Units",
     stem: "siunitx",
     ctan: ["siunitx"],
@@ -155,6 +178,7 @@ export const snippets = {
     },
   },
   csquotes: {
+    gadr: "quotation-marks",
     category: "Quotations",
     stem: "csquotes",
     ctan: ["csquotes"],
@@ -166,6 +190,7 @@ export const snippets = {
     },
   },
   outerquote: {
+    gadr: "quotation-marks",
     category: "Quotations",
     stem: "csquotes",
     title: "Plain “quotes”",
@@ -179,6 +204,7 @@ export const snippets = {
     },
   },
   paralist: {
+    gadr: "inline-and-compact-lists",
     category: "Lists",
     stem: "paralist",
     ctan: ["paralist"],
@@ -190,6 +216,7 @@ export const snippets = {
     },
   },
   diagbox: {
+    gadr: "diagonal-table-cells",
     category: "Tables",
     stem: "diagbox",
     ctan: ["diagbox"],
@@ -201,6 +228,7 @@ export const snippets = {
     },
   },
   mindflow: {
+    gadr: "margin-notes",
     category: "Notes",
     stem: "mindflow",
     ctan: ["mindflow"],
@@ -212,6 +240,7 @@ export const snippets = {
     },
   },
   textcmds: {
+    gadr: "quotation-marks",
     category: "Quotations",
     stem: "textcmds",
     ctan: ["textcmds"],
@@ -224,6 +253,7 @@ export const snippets = {
     },
   },
   booktabs: {
+    gadr: "table-rules",
     category: "Tables",
     stem: "tables", // example lives in tables.example.*.tex
     preambleStem: "booktabs", // but the package preamble is booktabs.preamble.*
@@ -252,6 +282,7 @@ export const snippets = {
   // (no example) — these packages act on page breaks and spacing, which a
   // cropped snippet cannot show.
   microtype: {
+    gadr: "overfull-lines",
     category: "Typography",
     stem: "microtype",
     ctan: ["microtype"],
@@ -263,6 +294,7 @@ export const snippets = {
     },
   },
   "widows-orphans": {
+    gadr: "widows-and-orphans",
     category: "Typography",
     stem: "nowidow",
     title: "Widows & orphans",
@@ -275,6 +307,7 @@ export const snippets = {
     },
   },
   impnattypo: {
+    gadr: "short-last-lines",
     category: "Typography",
     stem: "impnattypo",
     ctan: ["impnattypo"],
@@ -286,6 +319,7 @@ export const snippets = {
     },
   },
   xurl: {
+    gadr: "url-line-breaks",
     category: "Typography",
     stem: "url",
     ctan: ["xurl", "url"],
@@ -309,6 +343,7 @@ export const snippets = {
     },
   },
   hyphenation: {
+    gadr: "hyphenation",
     category: "More Hints",
     stem: "hyphenation",
     title: "Hyphenation",
@@ -321,6 +356,7 @@ export const snippets = {
     },
   },
   abbreviations: {
+    gadr: "acronyms-and-glossaries",
     category: "Glossaries",
     stem: "abbreviations",
     title: "Abbreviations",
