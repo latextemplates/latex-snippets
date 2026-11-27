@@ -2,12 +2,13 @@ import React from "react";
 
 // Page heading for a snippet: the package title with its CTAN package(s)
 // rendered as linked tags right next to it. Used with hide_title in the MDX
-// front-matter so this is the page's only H1.
-export default function PackageHeading({ title, ctan = [] }) {
+// front-matter so this is the page's only H1. `gadr` links the decision record
+// on why this package was picked.
+export default function PackageHeading({ title, ctan = [], gadr }) {
   return (
     <header className="package-heading">
       <h1 className="package-heading__title">{title}</h1>
-      {ctan.length > 0 && (
+      {(ctan.length > 0 || gadr) && (
         <div className="ctan-tags">
           {ctan.map((p) => (
             <a
@@ -21,6 +22,17 @@ export default function PackageHeading({ title, ctan = [] }) {
               {p.name}
             </a>
           ))}
+          {gadr && (
+            <a
+              className="ctan-tag gadr-tag"
+              href={gadr}
+              target="_blank"
+              rel="noreferrer"
+              title="Why this package, and the alternatives"
+            >
+              GADR
+            </a>
+          )}
         </div>
       )}
     </header>

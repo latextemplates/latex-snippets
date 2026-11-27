@@ -2,3 +2,7 @@
 	path = generator-latex-template
 	url = https://github.com/latextemplates/generator-latex-template.git
 	branch = main
+[submodule "gadr-latex-packages"]
+	path = gadr-latex-packages
+	url = https://github.com/latextemplates/gadr-latex-packages.git
+	branch = main

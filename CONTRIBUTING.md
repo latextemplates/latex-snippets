@@ -20,6 +20,8 @@ This site is a [Docusaurus](https://docusaurus.io/) showcase of the LaTeX packag
 When you add a snippet here, please also add or update the matching decision record in
 [gadr-latex-packages](https://github.com/latextemplates/gadr-latex-packages), so that *why* this package
 was picked for the problem is written down next to *how* it is used.
+Set the entry's `gadr` to that record; the page then links it.
+If the generator does not provide the package, point `mwe` at an MWE of the record instead (see `snippets.config.mjs`).
 
 ## Create a pull request
 

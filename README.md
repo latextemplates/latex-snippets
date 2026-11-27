@@ -12,6 +12,10 @@ Nothing in `docs/snippets/` or `static/img/snippets/` is hand-written:
 - **Templates** (the LaTeX source) come from the
   [generator-latex-template](https://github.com/latextemplates/generator-latex-template)
   submodule: `generators/app/templates/<stem>.{preamble,example}.<lang>.tex`.
+- **GADR MWEs** for packages the generator does not provide come from the
+  [gadr-latex-packages](https://github.com/latextemplates/gadr-latex-packages)
+  submodule (`mwe` in the catalog); such a page says that the templates do not
+  contain it. Every page with a decision record links it with a "GADR" badge.
 - **Catalog** (which templates become pages, plus categories, descriptions, CTAN
   tags, German labels) is curated here in **`snippets.config.mjs`** — edit it in
   one commit; no submodule bump needed.
@@ -31,7 +35,7 @@ a cropped SVG with the `texlive/texlive` Docker image, and writes the MDX pages.
   in this order: `GENERATOR_DIR` → `./generator-latex-template` (submodule) →
   `../generator-latex-template` (flat dev workspace).
 
-The submodule is pinned to a generator commit; Dependabot bumps it daily. Bump
+The submodules are pinned to a commit; Dependabot bumps them daily. Bump
 it manually with `git -C generator-latex-template pull` + commit when the
 generator templates change and you want them sooner.
 
