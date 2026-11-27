@@ -35,6 +35,9 @@
 //                 active one (e.g. { listings: "listings" }, { todo: "pdfcomment" })
 //   de          — German overrides: { description }
 //   companion   — optional verified cross-reference to "The LaTeX Companion"
+//   compare     — Bad/Good card: comparisons/<slug>.tex is compiled without and
+//                 with the package's preamble snippet; { problem, solution }
+//                 are the one-liners under the red and the green rendering
 //   gadr        — decision record in gadr-latex-packages (file name without .md);
 //                 shown as a "GADR" badge linking to it
 //   mwe         — for a package the generator does not provide: an MWE in the
@@ -314,9 +317,21 @@ export const snippets = {
     ctan: ["impnattypo"],
     description:
       "No lone short word as the last line of a paragraph (LuaLaTeX only — the pdfTeX fallback loosens word spacing everywhere).",
+    compare: {
+      problem:
+        "The last line holds a single short word, and the next paragraph's indent starts below empty space.",
+      solution:
+        "The line breaks of the paragraph are adjusted so the last line carries at least two words.",
+    },
     de: {
       description:
         "Kein einzelnes kurzes Wort als letzte Absatzzeile (nur LuaLaTeX – der pdfTeX-Fallback lockert den Wortabstand überall).",
+      compare: {
+        problem:
+          "Die letzte Zeile enthält nur ein kurzes Wort, und der Einzug des nächsten Absatzes beginnt unter leerem Raum.",
+        solution:
+          "Die Zeilenumbrüche des Absatzes werden so angepasst, dass die letzte Zeile mindestens zwei Wörter trägt.",
+      },
     },
   },
   xurl: {
@@ -326,9 +341,21 @@ export const snippets = {
     ctan: ["xurl", "url"],
     description:
       "Long URLs may break after any character (and at hyphens), so they no longer run into the margin.",
+    compare: {
+      problem:
+        "The URL may break only after a slash or a hyphen, so the line before it stays half empty or the URL runs into the margin.",
+      solution:
+        "The URL breaks wherever the line ends and stays inside the text block.",
+    },
     de: {
       description:
         "Lange URLs dürfen nach jedem Zeichen (und an Bindestrichen) umbrechen und ragen nicht mehr in den Rand.",
+      compare: {
+        problem:
+          "Die URL darf nur nach einem Schrägstrich oder Bindestrich umbrechen, sodass die Zeile davor halb leer bleibt oder die URL in den Rand ragt.",
+        solution:
+          "Die URL bricht dort um, wo die Zeile endet, und bleibt im Satzspiegel.",
+      },
     },
   },
   paragraphs: {

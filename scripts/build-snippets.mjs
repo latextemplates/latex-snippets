@@ -436,7 +436,28 @@ const MWE_NOTE = {
   de: "Dieses Beispiel stammt aus dem Decision Record; die Templates enthalten es nicht.",
 };
 
-function mdx(slug, meta, locale, description, preamble, fragments, defs) {
+const COMPARE_LABELS = {
+  en: { before: "Without", after: "With" },
+  de: { before: "Ohne", after: "Mit" },
+};
+
+function comparisonBlock(meta, locale, comparison) {
+  if (!comparison) return "";
+  const texts = (locale === "de" && meta.de?.compare) || meta.compare;
+  const pkg = meta.ctan?.[0] ?? meta.title ?? "";
+  const l = COMPARE_LABELS[locale];
+  return `<Comparison before="${comparison.before}" after="${comparison.after}" beforeLabel=${JSON.stringify(`${l.before} ${pkg}`)} afterLabel=${JSON.stringify(`${l.after} ${pkg}`)} problem=${JSON.stringify(texts.problem)} solution=${JSON.stringify(texts.solution)}>
+
+\`\`\`latex
+${comparison.code}
+\`\`\`
+
+</Comparison>
+
+`;
+}
+
+function mdx(slug, meta, locale, description, preamble, fragments, defs, comparison) {
   const title = meta.title ?? slug;
   const ctanJson = JSON.stringify(
     (meta.ctan ?? []).map((p) => ({
@@ -494,6 +515,7 @@ hide_title: true
 ---
 
 import Snippet from '@site/src/components/Snippet';
+import Comparison from '@site/src/components/Comparison';
 import PackageHeading from '@site/src/components/PackageHeading';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
@@ -502,7 +524,7 @@ import TabItem from '@theme/TabItem';
 
 ${description}${meta.mwe ? `\n\n${MWE_NOTE[locale]}` : ""}
 
-<Tabs>
+${comparisonBlock(meta, locale, comparison)}<Tabs>
 ${exampleTab}
 ${defsTab}
 ${preambleTab}
@@ -560,6 +582,35 @@ async function buildMwe(slug, meta, locale) {
   );
   console.log(`  wrote ${locale}/${catSlug}/${slug}.mdx (GADR MWE)`);
   return true;
+}
+
+// Bad/Good: comparisons/<slug>.tex compiled twice in a narrow paragraph — once
+// with the package's preamble snippet removed from the generated preamble (so
+// no per-package "off" switch is needed), once as generated. The parbox narrows
+// the paragraph so line breaks and margins show; luatodonotes refuses such a
+// narrow page, so it is disabled (no comparison uses TODO notes). hyperref is
+// set to draft: in DVI mode its links are unbreakable boxes, which would hide
+// how a URL breaks (the real PDF builds break links).
+const COMPARE_WIDTH = "9cm";
+const COMPARE_PREAMBLE =
+  "\\PassOptionsToPackage{disable}{luatodonotes}\n\\PassOptionsToPackage{draft}{hyperref}\n";
+const enComparisonBuilt = new Map();
+
+async function buildComparison(slug, cfg, packagePreamble) {
+  const fragment = await readFile(join(ROOT, "comparisons", `${slug}.tex`), "utf8");
+  const { genDir, preamble } = await getBase(cfg, "en");
+  const snippet = packagePreamble.trim();
+  if (!preamble.includes(snippet)) {
+    throw new Error(`comparison ${slug}: package preamble not found verbatim in the generated preamble`);
+  }
+  const without = COMPARE_PREAMBLE + preamble.replace(snippet, "");
+  // minipage, not \parbox: inside a macro argument \url loses its break points.
+  // A normal paragraph indent: the host zeroes it, and impnattypo measures the
+  // last line against twice the indent.
+  const boxed = `\\begin{minipage}{${COMPARE_WIDTH}}\\setlength{\\parindent}{1.5em}\n${fragment}\\end{minipage}`;
+  const before = await compileFragmentToSvg(`${slug}-without`, 0, genDir, without, boxed, null, null);
+  const after = await compileFragmentToSvg(`${slug}-with`, 0, genDir, COMPARE_PREAMBLE + preamble, boxed, null, null);
+  return { code: fragment.trim(), before, after };
 }
 
 async function buildPackage(slug, meta, locale) {
@@ -644,11 +695,21 @@ async function buildPackage(slug, meta, locale) {
   const catSlug = slugify(meta.category ?? "misc");
   const outMdx = join(DOCS[locale], catSlug, `${slug}.mdx`);
 
+  let comparison = null;
+  if (meta.compare) {
+    if (locale === "en") {
+      comparison = await buildComparison(slug, cfg, packagePreamble);
+      enComparisonBuilt.set(slug, comparison);
+    } else {
+      comparison = enComparisonBuilt.get(slug);
+    }
+  }
+
   const writePage = async (built) => {
     await mkdir(dirname(outMdx), { recursive: true });
     await writeFile(
       outMdx,
-      mdx(slug, meta, locale, description, packagePreamble, built, defsCode),
+      mdx(slug, meta, locale, description, packagePreamble, built, defsCode, comparison),
     );
   };
 
