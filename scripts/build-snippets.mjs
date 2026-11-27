@@ -218,6 +218,9 @@ rr.cleanup();
       /^.*(\\pdfoutput=1|\\usepackage\{embedfile\}|\\embedfile\[|\\@IEEEcompsocnotconfonly).*\n/gm,
       "",
     )
+    // luatodonotes stops with "Cannot place labels on any side of text" on the
+    // narrow standalone page of a snippet; todonotes draws the same notes there.
+    .replace(/\\usepackage(\[[^\]]*\])?\{luatodonotes\}/g, "\\usepackage$1{todonotes}")
     // No snippet shows the cover page. ponytail: the generator uses options of the
     // template's vendored cover package (5.3.0 preview) that TeX Live lacks; keep
     // dropping it until that version is on CTAN.
