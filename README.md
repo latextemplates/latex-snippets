@@ -22,13 +22,16 @@ Nothing in `docs/snippets/` or `static/img/snippets/` is hand-written:
 
 `scripts/build-snippets.mjs` resolves those templates under the canonical
 **IEEE conference** config, splits each example into fragments, compiles each to
-a cropped SVG with the `texlive/texlive` Docker image, and writes the MDX pages.
+a cropped SVG with the [`dante-ev/texlive`](https://github.com/dante-ev/docker-texlive) Docker image, and writes the MDX pages.
 
 ## Prerequisites
 
 - Node ≥ 18
-- Docker (for LaTeX compilation via `texlive/texlive:latest` — no host TeX Live
-  needed)
+- Docker (for LaTeX compilation via `ghcr.io/dante-ev/texlive:edge` — no host TeX Live
+  needed). This image ships the full TeX Live **plus** the external tools some
+  snippets call (PlantUML, Mermaid, TikZ-UML and the Java they need), which the
+  plain `texlive/texlive` image lacks. `edge` tracks the current TeX Live, as the
+  templates' CI does.
 - The `generator-latex-template` git submodule (the source of truth). After
   cloning: `git submodule update --init`, then install its deps once:
   `npm ci --prefix generator-latex-template`. The build resolves the generator

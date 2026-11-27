@@ -38,7 +38,7 @@ jobs:
         working-directory: generator-latex-template
 
       - name: Pre-pull TeX Live image
-        run: docker pull texlive/texlive:latest
+        run: docker pull ghcr.io/dante-ev/texlive:edge
 
       - name: Build snippets (LaTeX → SVG via Docker) + site
         run: npm run build
