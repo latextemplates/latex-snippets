@@ -162,6 +162,23 @@
   height: auto;
 }
 
+/* Page mode: each SVG is a whole small page, framed like a sheet of paper. */
+.ltg-compare__output--pages {
+  background: transparent;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ltg-compare__output--pages img {
+  zoom: 1.2;
+  background: #fff;
+  border: 1px solid var(--ifm-color-emphasis-400);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
 .ltg-compare__text {
   margin: 0.75rem 0 0;
   color: var(--ifm-font-color-base);

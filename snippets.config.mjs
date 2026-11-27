@@ -37,7 +37,9 @@
 //   companion   — optional verified cross-reference to "The LaTeX Companion"
 //   compare     — Bad/Good card: comparisons/<slug>.tex is compiled without and
 //                 with the package's preamble snippet; { problem, solution }
-//                 are the one-liners under the red and the green rendering
+//                 are the one-liners under the red and the green rendering.
+//                 With page: { width, height } it is set on small pages (for
+//                 effects at a page break) and each page is shown.
 //   gadr        — decision record in gadr-latex-packages (file name without .md);
 //                 shown as a "GADR" badge linking to it
 //   mwe         — for a package the generator does not provide: an MWE in the
@@ -292,9 +294,22 @@ export const snippets = {
     ctan: ["microtype"],
     description:
       "Character protrusion and font expansion: even text colour, fewer hyphenations — the single biggest typographic upgrade.",
+    compare: {
+      width: "6cm",
+      problem:
+        "Narrow justified lines get wide gaps between words and many hyphenations, and punctuation at the line end makes the right margin look uneven.",
+      solution:
+        "Letters are expanded slightly and punctuation hangs into the margin: no hyphenation is needed here, and the spacing is even.",
+    },
     de: {
       description:
         "Optischer Randausgleich und Fontexpansion: gleichmäßiger Grauwert, weniger Trennungen – die größte typografische Verbesserung durch ein einzelnes Paket.",
+      compare: {
+        problem:
+          "Schmale Blocksatzzeilen bekommen weite Wortabstände und viele Trennungen, und Satzzeichen am Zeilenende lassen den rechten Rand unruhig wirken.",
+        solution:
+          "Die Buchstaben werden leicht gedehnt und Satzzeichen ragen in den Rand: Hier ist keine Trennung nötig, und die Abstände sind gleichmäßig.",
+      },
     },
   },
   "widows-orphans": {
@@ -305,9 +320,22 @@ export const snippets = {
     ctan: ["lua-widow-control", "nowidow"],
     description:
       "No lone paragraph line at the top or bottom of a page. LuaLaTeX: lua-widow-control lengthens or shortens the paragraph by one line instead of leaving an empty line; pdfLaTeX: nowidow.",
+    compare: {
+      page: { width: "6.5cm", height: "5.4cm" },
+      problem:
+        "The last line of the middle paragraph stands alone at the top of the next page (a widow).",
+      solution:
+        "lua-widow-control sets the first paragraph one line longer, so two lines move to the next page and both pages stay full.",
+    },
     de: {
       description:
         "Keine Hurenkinder und Schusterjungen (einzelne Absatzzeilen am Seitenanfang oder -ende). LuaLaTeX: lua-widow-control verlängert oder verkürzt den Absatz um eine Zeile statt eine Leerzeile zu lassen; pdfLaTeX: nowidow.",
+      compare: {
+        problem:
+          "Die letzte Zeile des mittleren Absatzes steht allein oben auf der nächsten Seite (ein Hurenkind).",
+        solution:
+          "lua-widow-control setzt den ersten Absatz eine Zeile länger, sodass zwei Zeilen auf die nächste Seite wandern und beide Seiten voll bleiben.",
+      },
     },
   },
   impnattypo: {

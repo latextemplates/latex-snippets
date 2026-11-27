@@ -25,7 +25,7 @@
 // Usage:  node scripts/build-snippets.mjs [package ...]   (default: all)
 //   env GENERATOR_DIR  path to the generator-latex-template checkout
 
-import { readFile, writeFile, mkdir, rm, cp } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rm, cp, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -446,7 +446,7 @@ function comparisonBlock(meta, locale, comparison) {
   const texts = (locale === "de" && meta.de?.compare) || meta.compare;
   const pkg = meta.ctan?.[0] ?? meta.title ?? "";
   const l = COMPARE_LABELS[locale];
-  return `<Comparison before="${comparison.before}" after="${comparison.after}" beforeLabel=${JSON.stringify(`${l.before} ${pkg}`)} afterLabel=${JSON.stringify(`${l.after} ${pkg}`)} problem=${JSON.stringify(texts.problem)} solution=${JSON.stringify(texts.solution)}>
+  return `<Comparison before={${JSON.stringify(comparison.before)}} after={${JSON.stringify(comparison.after)}}${comparison.pages ? " pages" : ""} beforeLabel=${JSON.stringify(`${l.before} ${pkg}`)} afterLabel=${JSON.stringify(`${l.after} ${pkg}`)} problem=${JSON.stringify(texts.problem)} solution=${JSON.stringify(texts.solution)}>
 
 \`\`\`latex
 ${comparison.code}
@@ -586,8 +586,10 @@ async function buildMwe(slug, meta, locale) {
 
 // Bad/Good: comparisons/<slug>.tex compiled twice in a narrow paragraph — once
 // with the package's preamble snippet removed from the generated preamble (so
-// no per-package "off" switch is needed), once as generated. The parbox narrows
-// the paragraph so line breaks and margins show; luatodonotes refuses such a
+// no per-package "off" switch is needed), once as generated. The minipage
+// (compare.width, default 9cm) narrows the paragraph so line breaks and margins
+// show. microtype's font expansion only shifts glyphs in DVI mode instead of
+// scaling them; line breaks and spacing are still those of the PDF. luatodonotes refuses such a
 // narrow page, so it is disabled (no comparison uses TODO notes). hyperref is
 // set to draft: in DVI mode its links are unbreakable boxes, which would hide
 // how a URL breaks (the real PDF builds break links).
@@ -596,7 +598,53 @@ const COMPARE_PREAMBLE =
   "\\PassOptionsToPackage{disable}{luatodonotes}\n\\PassOptionsToPackage{draft}{hyperref}\n";
 const enComparisonBuilt = new Map();
 
-async function buildComparison(slug, cfg, packagePreamble) {
+// Page mode (compare.page = { width, height }): widows, orphans and the like
+// only exist at a page break, so the fragment is set on small pages
+// (flushbottom, as in the templates) and every page becomes its own SVG.
+function pageDoc(preamble, fragment, page) {
+  return `\\documentclass[10pt]{article}
+${preamble}
+\\usepackage[paperwidth=${page.width},paperheight=${page.height},margin=4mm]{geometry}
+\\pagestyle{empty}
+\\flushbottom
+\\begin{document}
+\\setlength{\\parindent}{1.5em}%
+${fragment}
+% The IEEE preamble's flushend hook starts a new page when the text ends in the
+% first column; on these one-column pages that page would stay empty.
+\\makeatletter\\@firstcolumnfalse\\makeatother
+\\end{document}
+`;
+}
+
+async function compilePagesToSvg(svgSlug, genDir, preamble, fragment, page) {
+  const base = `_pages-${svgSlug}`;
+  await writeFile(join(genDir, `${base}.tex`), pageDoc(preamble, fragment, page));
+  try {
+    await compileTwice(genDir, base);
+  } catch {
+    throw new Error(`compile failed (${svgSlug} pages):\n${texError(await readLog(genDir, base))}`);
+  }
+  await dockerTexlive(genDir, [
+    "dvisvgm",
+    "--no-fonts",
+    "--page=1-",
+    "--bbox=papersize",
+    `--output=${base}-%p.svg`,
+    `${base}.dvi`,
+  ]);
+  const files = (await readdir(genDir)).filter((f) => f.startsWith(`${base}-`) && f.endsWith(".svg")).sort();
+  const out = [];
+  for (const [i, f] of files.entries()) {
+    const svgRel = `img/snippets/${svgSlug}-${i}.svg`;
+    await mkdir(dirname(join(ROOT, "static", svgRel)), { recursive: true });
+    await cp(join(genDir, f), join(ROOT, "static", svgRel));
+    out.push(`/${svgRel}`);
+  }
+  return out;
+}
+
+async function buildComparison(slug, cfg, packagePreamble, compare) {
   const fragment = await readFile(join(ROOT, "comparisons", `${slug}.tex`), "utf8");
   const { genDir, preamble } = await getBase(cfg, "en");
   const snippet = packagePreamble.trim();
@@ -604,13 +652,18 @@ async function buildComparison(slug, cfg, packagePreamble) {
     throw new Error(`comparison ${slug}: package preamble not found verbatim in the generated preamble`);
   }
   const without = COMPARE_PREAMBLE + preamble.replace(snippet, "");
+  if (compare.page) {
+    const before = await compilePagesToSvg(`${slug}-without`, genDir, without, fragment, compare.page);
+    const after = await compilePagesToSvg(`${slug}-with`, genDir, COMPARE_PREAMBLE + preamble, fragment, compare.page);
+    return { code: fragment.trim(), before, after, pages: true };
+  }
   // minipage, not \parbox: inside a macro argument \url loses its break points.
   // A normal paragraph indent: the host zeroes it, and impnattypo measures the
   // last line against twice the indent.
-  const boxed = `\\begin{minipage}{${COMPARE_WIDTH}}\\setlength{\\parindent}{1.5em}\n${fragment}\\end{minipage}`;
+  const boxed = `\\begin{minipage}{${compare.width ?? COMPARE_WIDTH}}\\setlength{\\parindent}{1.5em}\n${fragment}\\end{minipage}`;
   const before = await compileFragmentToSvg(`${slug}-without`, 0, genDir, without, boxed, null, null);
   const after = await compileFragmentToSvg(`${slug}-with`, 0, genDir, COMPARE_PREAMBLE + preamble, boxed, null, null);
-  return { code: fragment.trim(), before, after };
+  return { code: fragment.trim(), before: [before], after: [after] };
 }
 
 async function buildPackage(slug, meta, locale) {
@@ -698,7 +751,7 @@ async function buildPackage(slug, meta, locale) {
   let comparison = null;
   if (meta.compare) {
     if (locale === "en") {
-      comparison = await buildComparison(slug, cfg, packagePreamble);
+      comparison = await buildComparison(slug, cfg, packagePreamble, meta.compare);
       enComparisonBuilt.set(slug, comparison);
     } else {
       comparison = enComparisonBuilt.get(slug);
