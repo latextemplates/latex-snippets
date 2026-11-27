@@ -28,7 +28,10 @@ a cropped SVG with the [`dante-ev/texlive`](https://github.com/dante-ev/docker-t
 
 - Node ≥ 18
 - Docker (for LaTeX compilation via `ghcr.io/dante-ev/texlive:edge` — no host TeX Live
-  needed)
+  needed). This image ships the full TeX Live **plus** the external tools some
+  snippets call (PlantUML, Mermaid, TikZ-UML and the Java they need), which the
+  plain `texlive/texlive` image lacks. `edge` tracks the current TeX Live, as the
+  templates' CI does.
 - The `generator-latex-template` git submodule (the source of truth). After
   cloning: `git submodule update --init`, then install its deps once:
   `npm ci --prefix generator-latex-template`. The build resolves the generator
