@@ -287,6 +287,20 @@ ${PAR_SPACING}${fragment}
 `;
 }
 
+// Host for fragments with margin notes (\marginpar, todonotes): standalone
+// boxes the fragment, where margin notes are not allowed. A real page has a
+// margin; dvisvgm crops it to the ink.
+function marginDoc(preamble, fragment) {
+  return `\\documentclass[10pt]{article}
+${preamble}
+\\usepackage[paperwidth=16cm,paperheight=20cm,left=4pt,top=4pt,textwidth=10cm,marginparsep=4mm,marginparwidth=4cm]{geometry}
+\\pagestyle{empty}
+${NO_FLOATS}\\begin{document}
+${PAR_SPACING}${fragment}
+\\end{document}
+`;
+}
+
 function contextDoc(preamble, exampleFull, innerClass) {
   const cls = innerClass ?? "article";
   return `\\documentclass[a4paper,10pt]{${cls}}
@@ -390,6 +404,7 @@ async function compileFragmentToSvg(
   const host = innerClass ? previewDoc : standaloneDoc;
 
   let firstErr = null;
+  let bbox = "--bbox=preview";
   await write(host(preamble, fragment, null, innerClass));
   try {
     await compileTwice(genDir, base);
@@ -409,6 +424,15 @@ async function compileFragmentToSvg(
         `compile failed (${svgSlug} frag ${idx}):\n${firstErr ? `[plain] ${firstErr}\n` : ""}[xr] ${e}`,
       );
     }
+  } else if (firstErr !== null && !innerClass) {
+    await write(marginDoc(preamble, fragment));
+    try {
+      await compileTwice(genDir, base);
+    } catch {
+      const e = texError(await readLog(genDir, base));
+      throw new Error(`compile failed (${svgSlug} frag ${idx}):\n[standalone] ${firstErr}\n[page] ${e}`);
+    }
+    bbox = "--bbox=4pt";
   } else if (firstErr !== null) {
     throw new Error(`compile failed (${svgSlug} frag ${idx}):\n${firstErr}`);
   }
@@ -416,7 +440,7 @@ async function compileFragmentToSvg(
   await dockerTexlive(genDir, [
     "dvisvgm",
     "--no-fonts",
-    "--bbox=preview",
+    bbox,
     `--output=${base}.svg`,
     `${base}.dvi`,
   ]);
