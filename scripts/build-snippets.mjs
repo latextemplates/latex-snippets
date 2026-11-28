@@ -592,13 +592,11 @@ async function buildMwe(slug, meta, locale) {
 // no per-package "off" switch is needed), once as generated. The minipage
 // (compare.width, default 9cm) narrows the paragraph so line breaks and margins
 // show. microtype's font expansion only shifts glyphs in DVI mode instead of
-// scaling them; line breaks and spacing are still those of the PDF. luatodonotes refuses such a
-// narrow page, so it is disabled (no comparison uses TODO notes). hyperref is
+// scaling them; line breaks and spacing are still those of the PDF. hyperref is
 // set to draft: in DVI mode its links are unbreakable boxes, which would hide
 // how a URL breaks (the real PDF builds break links).
 const COMPARE_WIDTH = "9cm";
-const COMPARE_PREAMBLE =
-  "\\PassOptionsToPackage{disable}{luatodonotes}\n\\PassOptionsToPackage{draft}{hyperref}\n";
+const COMPARE_PREAMBLE = "\\PassOptionsToPackage{draft}{hyperref}\n";
 const enComparisonBuilt = new Map();
 
 // Page mode (compare.page = { width, height }): widows, orphans and the like
