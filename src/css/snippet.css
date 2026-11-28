@@ -109,3 +109,100 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Bad/Good comparison card: red "without" and green "with" side by side, the
+   shared source below. */
+.ltg-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.ltg-compare__side {
+  border: 2px solid;
+  border-radius: 8px;
+  padding: 0.75rem;
+  min-width: 0;
+}
+
+.ltg-compare__side--bad {
+  border-color: #c0392b;
+  background: #fdecea;
+}
+
+.ltg-compare__side--good {
+  border-color: #27865c;
+  background: #eaf7ef;
+}
+
+.ltg-compare__label {
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.ltg-compare__side--bad .ltg-compare__label {
+  color: #c0392b;
+}
+
+.ltg-compare__side--good .ltg-compare__label {
+  color: #27865c;
+}
+
+.ltg-compare__output {
+  background: #fff;
+  border-radius: 6px;
+  padding: 0.75rem;
+  overflow: hidden;
+}
+
+.ltg-compare__output img {
+  zoom: 1.4;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Page mode: each SVG is a whole small page, framed like a sheet of paper. */
+.ltg-compare__output--pages {
+  background: transparent;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ltg-compare__output--pages img {
+  zoom: 1.2;
+  background: #fff;
+  border: 1px solid var(--ifm-color-emphasis-400);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.ltg-compare__text {
+  margin: 0.75rem 0 0;
+  color: var(--ifm-font-color-base);
+}
+
+.ltg-compare__code {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.ltg-compare__code pre {
+  margin: 0;
+}
+
+[data-theme="dark"] .ltg-compare__side--bad {
+  background: #3a1f1c;
+}
+
+[data-theme="dark"] .ltg-compare__side--good {
+  background: #1b3326;
+}
+
+@media (max-width: 700px) {
+  .ltg-compare {
+    grid-template-columns: 1fr;
+  }
+}

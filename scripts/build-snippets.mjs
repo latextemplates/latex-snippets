@@ -25,7 +25,7 @@
 // Usage:  node scripts/build-snippets.mjs [package ...]   (default: all)
 //   env GENERATOR_DIR  path to the generator-latex-template checkout
 
-import { readFile, writeFile, mkdir, rm, cp } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rm, cp, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -287,6 +287,20 @@ ${PAR_SPACING}${fragment}
 `;
 }
 
+// Host for fragments with margin notes (\marginpar, todonotes): standalone
+// boxes the fragment, where margin notes are not allowed. A real page has a
+// margin; dvisvgm crops it to the ink.
+function marginDoc(preamble, fragment) {
+  return `\\documentclass[10pt]{article}
+${preamble}
+\\usepackage[paperwidth=16cm,paperheight=20cm,left=4pt,top=4pt,textwidth=10cm,marginparsep=4mm,marginparwidth=4cm]{geometry}
+\\pagestyle{empty}
+${NO_FLOATS}\\begin{document}
+${PAR_SPACING}${fragment}
+\\end{document}
+`;
+}
+
 function contextDoc(preamble, exampleFull, innerClass) {
   const cls = innerClass ?? "article";
   return `\\documentclass[a4paper,10pt]{${cls}}
@@ -390,6 +404,7 @@ async function compileFragmentToSvg(
   const host = innerClass ? previewDoc : standaloneDoc;
 
   let firstErr = null;
+  let bbox = "--bbox=preview";
   await write(host(preamble, fragment, null, innerClass));
   try {
     await compileTwice(genDir, base);
@@ -409,6 +424,15 @@ async function compileFragmentToSvg(
         `compile failed (${svgSlug} frag ${idx}):\n${firstErr ? `[plain] ${firstErr}\n` : ""}[xr] ${e}`,
       );
     }
+  } else if (firstErr !== null && !innerClass) {
+    await write(marginDoc(preamble, fragment));
+    try {
+      await compileTwice(genDir, base);
+    } catch {
+      const e = texError(await readLog(genDir, base));
+      throw new Error(`compile failed (${svgSlug} frag ${idx}):\n[standalone] ${firstErr}\n[page] ${e}`);
+    }
+    bbox = "--bbox=4pt";
   } else if (firstErr !== null) {
     throw new Error(`compile failed (${svgSlug} frag ${idx}):\n${firstErr}`);
   }
@@ -416,7 +440,7 @@ async function compileFragmentToSvg(
   await dockerTexlive(genDir, [
     "dvisvgm",
     "--no-fonts",
-    "--bbox=preview",
+    bbox,
     `--output=${base}.svg`,
     `${base}.dvi`,
   ]);
@@ -439,7 +463,28 @@ const MWE_NOTE = {
   de: "Dieses Beispiel stammt aus dem Decision Record; die Templates enthalten es nicht.",
 };
 
-function mdx(slug, meta, locale, description, preamble, fragments, defs) {
+const COMPARE_LABELS = {
+  en: { before: "Without", after: "With" },
+  de: { before: "Ohne", after: "Mit" },
+};
+
+function comparisonBlock(meta, locale, comparison) {
+  if (!comparison) return "";
+  const texts = (locale === "de" && meta.de?.compare) || meta.compare;
+  const pkg = meta.ctan?.[0] ?? meta.title ?? "";
+  const l = COMPARE_LABELS[locale];
+  return `<Comparison before={${JSON.stringify(comparison.before)}} after={${JSON.stringify(comparison.after)}}${comparison.pages ? " pages" : ""} beforeLabel=${JSON.stringify(`${l.before} ${pkg}`)} afterLabel=${JSON.stringify(`${l.after} ${pkg}`)} problem=${JSON.stringify(texts.problem)} solution=${JSON.stringify(texts.solution)}>
+
+\`\`\`latex
+${comparison.code}
+\`\`\`
+
+</Comparison>
+
+`;
+}
+
+function mdx(slug, meta, locale, description, preamble, fragments, defs, comparison) {
   const title = meta.title ?? slug;
   const ctanJson = JSON.stringify(
     (meta.ctan ?? []).map((p) => ({
@@ -497,6 +542,7 @@ hide_title: true
 ---
 
 import Snippet from '@site/src/components/Snippet';
+import Comparison from '@site/src/components/Comparison';
 import PackageHeading from '@site/src/components/PackageHeading';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
@@ -505,7 +551,7 @@ import TabItem from '@theme/TabItem';
 
 ${description}${meta.mwe ? `\n\n${MWE_NOTE[locale]}` : ""}
 
-<Tabs>
+${comparisonBlock(meta, locale, comparison)}<Tabs>
 ${exampleTab}
 ${defsTab}
 ${preambleTab}
@@ -563,6 +609,86 @@ async function buildMwe(slug, meta, locale) {
   );
   console.log(`  wrote ${locale}/${catSlug}/${slug}.mdx (GADR MWE)`);
   return true;
+}
+
+// Bad/Good: comparisons/<slug>.tex compiled twice in a narrow paragraph — once
+// with the package's preamble snippet removed from the generated preamble (so
+// no per-package "off" switch is needed), once as generated. The minipage
+// (compare.width, default 9cm) narrows the paragraph so line breaks and margins
+// show. microtype's font expansion only shifts glyphs in DVI mode instead of
+// scaling them; line breaks and spacing are still those of the PDF. hyperref is
+// set to draft: in DVI mode its links are unbreakable boxes, which would hide
+// how a URL breaks (the real PDF builds break links).
+const COMPARE_WIDTH = "9cm";
+const COMPARE_PREAMBLE = "\\PassOptionsToPackage{draft}{hyperref}\n";
+const enComparisonBuilt = new Map();
+
+// Page mode (compare.page = { width, height }): widows, orphans and the like
+// only exist at a page break, so the fragment is set on small pages
+// (flushbottom, as in the templates) and every page becomes its own SVG.
+function pageDoc(preamble, fragment, page) {
+  return `\\documentclass[10pt]{article}
+${preamble}
+\\usepackage[paperwidth=${page.width},paperheight=${page.height},margin=4mm]{geometry}
+\\pagestyle{empty}
+\\flushbottom
+\\begin{document}
+\\setlength{\\parindent}{1.5em}%
+${fragment}
+% The IEEE preamble's flushend hook starts a new page when the text ends in the
+% first column; on these one-column pages that page would stay empty.
+\\makeatletter\\@firstcolumnfalse\\makeatother
+\\end{document}
+`;
+}
+
+async function compilePagesToSvg(svgSlug, genDir, preamble, fragment, page) {
+  const base = `_pages-${svgSlug}`;
+  await writeFile(join(genDir, `${base}.tex`), pageDoc(preamble, fragment, page));
+  try {
+    await compileTwice(genDir, base);
+  } catch {
+    throw new Error(`compile failed (${svgSlug} pages):\n${texError(await readLog(genDir, base))}`);
+  }
+  await dockerTexlive(genDir, [
+    "dvisvgm",
+    "--no-fonts",
+    "--page=1-",
+    "--bbox=papersize",
+    `--output=${base}-%p.svg`,
+    `${base}.dvi`,
+  ]);
+  const files = (await readdir(genDir)).filter((f) => f.startsWith(`${base}-`) && f.endsWith(".svg")).sort();
+  const out = [];
+  for (const [i, f] of files.entries()) {
+    const svgRel = `img/snippets/${svgSlug}-${i}.svg`;
+    await mkdir(dirname(join(ROOT, "static", svgRel)), { recursive: true });
+    await cp(join(genDir, f), join(ROOT, "static", svgRel));
+    out.push(`/${svgRel}`);
+  }
+  return out;
+}
+
+async function buildComparison(slug, cfg, packagePreamble, compare) {
+  const fragment = await readFile(join(ROOT, "comparisons", `${slug}.tex`), "utf8");
+  const { genDir, preamble } = await getBase(cfg, "en");
+  const snippet = packagePreamble.trim();
+  if (!preamble.includes(snippet)) {
+    throw new Error(`comparison ${slug}: package preamble not found verbatim in the generated preamble`);
+  }
+  const without = COMPARE_PREAMBLE + preamble.replace(snippet, "");
+  if (compare.page) {
+    const before = await compilePagesToSvg(`${slug}-without`, genDir, without, fragment, compare.page);
+    const after = await compilePagesToSvg(`${slug}-with`, genDir, COMPARE_PREAMBLE + preamble, fragment, compare.page);
+    return { code: fragment.trim(), before, after, pages: true };
+  }
+  // minipage, not \parbox: inside a macro argument \url loses its break points.
+  // A normal paragraph indent: the host zeroes it, and impnattypo measures the
+  // last line against twice the indent.
+  const boxed = `\\begin{minipage}{${compare.width ?? COMPARE_WIDTH}}\\setlength{\\parindent}{1.5em}\n${fragment}\\end{minipage}`;
+  const before = await compileFragmentToSvg(`${slug}-without`, 0, genDir, without, boxed, null, null);
+  const after = await compileFragmentToSvg(`${slug}-with`, 0, genDir, COMPARE_PREAMBLE + preamble, boxed, null, null);
+  return { code: fragment.trim(), before: [before], after: [after] };
 }
 
 async function buildPackage(slug, meta, locale) {
@@ -647,11 +773,21 @@ async function buildPackage(slug, meta, locale) {
   const catSlug = slugify(meta.category ?? "misc");
   const outMdx = join(DOCS[locale], catSlug, `${slug}.mdx`);
 
+  let comparison = null;
+  if (meta.compare) {
+    if (locale === "en") {
+      comparison = await buildComparison(slug, cfg, packagePreamble, meta.compare);
+      enComparisonBuilt.set(slug, comparison);
+    } else {
+      comparison = enComparisonBuilt.get(slug);
+    }
+  }
+
   const writePage = async (built) => {
     await mkdir(dirname(outMdx), { recursive: true });
     await writeFile(
       outMdx,
-      mdx(slug, meta, locale, description, packagePreamble, built, defsCode),
+      mdx(slug, meta, locale, description, packagePreamble, built, defsCode, comparison),
     );
   };
 
